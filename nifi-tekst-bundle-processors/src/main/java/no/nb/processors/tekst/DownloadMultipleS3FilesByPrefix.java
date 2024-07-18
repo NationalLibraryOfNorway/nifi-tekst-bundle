@@ -39,7 +39,8 @@ import java.util.*;
 @Tags({"NB", "Tekst", "Text", "S3", "Download"})
 @CapabilityDescription("This processor downloads all files starting with prefix (folder-like) in an S3 bucket. " +
                        "Works for any regions (which the default S3 processors does not), " +
-                       "meaning it should work for all S3 compatible storages.")
+                       "meaning it should work for all S3 compatible storages. " +
+                       "Local folder is created if it does not exist.")
 @SideEffectFree
 public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
 
