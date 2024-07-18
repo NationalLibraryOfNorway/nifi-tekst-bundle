@@ -25,10 +25,15 @@ import org.apache.nifi.annotation.behavior.SideEffectFree;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.util.StandardValidators;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 @Tags({"NB", "Tekst", "Text", "S3", "Download"})
@@ -43,6 +48,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         .name("bucket")
         .displayName("S3 bucket")
         .description("S3 bucket name")
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .required(true)
         .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
         .build();
@@ -52,6 +58,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         .name("access_key")
         .displayName("S3 access key")
         .description("S3 access key")
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .required(true)
         .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
         .build();
@@ -71,6 +78,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         .name("region")
         .displayName("S3 region")
         .description("S3 region")
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .required(true)
         .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
         .build();
@@ -80,6 +88,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         .name("prefix")
         .displayName("Prefix")
         .description("Prefix (folder-like) in S3 that contains the files to download")
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .required(true)
         .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
         .build();
@@ -89,6 +98,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         .name("endpoint")
         .displayName("Endpoint")
         .description("S3 endpoint (url)")
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .required(true)
         .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
         .build();
@@ -98,6 +108,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         .name("local_folder")
         .displayName("Local folder")
         .description("Local folder on server to download the files to")
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .required(true)
         .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
         .build();
@@ -157,13 +168,13 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         }
 
         // Extract properties
-        String bucket = context.getProperty("bucket").getValue();
-        String access_key = context.getProperty("access_key").getValue();
+        String bucket = context.getProperty("bucket").evaluateAttributeExpressions(flowFile).getValue();
+        String access_key = context.getProperty("access_key").evaluateAttributeExpressions(flowFile).getValue();
         String secret_key = context.getProperty("secret_key").getValue();
-        String region = context.getProperty("region").getValue();
-        String endpoint = context.getProperty("endpoint").getValue();
-        String prefix = context.getProperty("prefix").getValue();
-        String local_folder = context.getProperty("local_folder").getValue();
+        String region = context.getProperty("region").evaluateAttributeExpressions(flowFile).getValue();
+        String endpoint = context.getProperty("endpoint").evaluateAttributeExpressions(flowFile).getValue();
+        String prefix = context.getProperty("prefix").evaluateAttributeExpressions(flowFile).getValue();
+        String local_folder = context.getProperty("local_folder").evaluateAttributeExpressions(flowFile).getValue();
 
         client = getS3Client(access_key, secret_key, region, endpoint);
         downloadAllItems(bucket, prefix, local_folder);
@@ -211,23 +222,23 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
         String local_folder
     ) {
         Iterable<Result<Item>> items = listItemsByPrefix(bucket, addTrailingSlashIfNotPresent(prefix));
-        getLogger().info("items objectNames");
-        items.forEach(item -> {
-            try {
-                getLogger().info(item.get().objectName());
-            } catch (Exception e) {
-                getLogger().info("No name found");
-            }
-        });
+
+        // Create directory if it does not exist - nio method does not throw if it exists
+        try {
+            Path path = Paths.get(local_folder);
+            Files.createDirectories(path);
+            getLogger().info("Downloading to " + local_folder);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         items.forEach(main_item -> {
             try {
                 String objectName = main_item.get().objectName();
-                getLogger().info("objectName: " + objectName);
+                getLogger().info("Downloading file " + objectName);
 
                 String[] objNameParts = objectName.split("/");
                 String fileName = objNameParts[objNameParts.length - 1];
-                getLogger().info("filename: " + fileName);
 
                 client.downloadObject(
                     DownloadObjectArgs
@@ -237,6 +248,8 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
                         .filename(local_folder + "/" + fileName)
                         .build()
                 );
+
+                getLogger().info("Finished downloaded file " + objectName);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
