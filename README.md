@@ -4,7 +4,7 @@ Bundle av prosessorer laget for produksjonsløyper for tekstmateriale.
 
 ## Lokal utvikling
 
-* Installer nifi, JDK 17 og Maven lokalt
+* Installer nifi, JDK 11 og Maven lokalt
 * Lag prosessorer under `nifi-text-bundle-processors`-modulen
 * Kjør `mvn clean install` for å bygge prosessorene
 * Kopier nar til nifi sin `lib`-mappe 
