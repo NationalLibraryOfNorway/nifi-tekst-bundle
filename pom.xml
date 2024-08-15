@@ -24,7 +24,7 @@
         <junit.version>5.10.3</junit.version>
     </properties>
 
-    <groupId>no.nb</groupId>
+    <groupId>no.nb.tekst</groupId>
     <artifactId>nifi-tekst-bundle</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
