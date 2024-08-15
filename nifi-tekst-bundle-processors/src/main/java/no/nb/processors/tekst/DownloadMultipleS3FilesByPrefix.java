@@ -170,22 +170,22 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
 
         // Extract properties
         String bucket = context.getProperty("bucket").evaluateAttributeExpressions(flowFile).getValue();
-        String access_key = context.getProperty("access_key").evaluateAttributeExpressions(flowFile).getValue();
-        String secret_key = context.getProperty("secret_key").getValue();
+        String accessKey = context.getProperty("access_key").evaluateAttributeExpressions(flowFile).getValue();
+        String secretKey = context.getProperty("secret_key").getValue();
         String region = context.getProperty("region").evaluateAttributeExpressions(flowFile).getValue();
         String endpoint = context.getProperty("endpoint").evaluateAttributeExpressions(flowFile).getValue();
         String prefix = context.getProperty("prefix").evaluateAttributeExpressions(flowFile).getValue();
-        String local_folder = context.getProperty("local_folder").evaluateAttributeExpressions(flowFile).getValue();
+        String localFolder = context.getProperty("local_folder").evaluateAttributeExpressions(flowFile).getValue();
 
-        client = getS3Client(access_key, secret_key, region, endpoint);
-        downloadAllItems(bucket, prefix, local_folder);
+        client = getS3Client(accessKey, secretKey, region, endpoint);
+        downloadAllItems(bucket, prefix, localFolder);
 
         session.transfer(flowFile, REL_SUCCESS);
     }
 
     private MinioClient getS3Client(
-        String access_key,
-        String secret_key,
+        String accessKey,
+        String secretKey,
         String region,
         String url
     ) {
@@ -193,7 +193,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
             .builder()
             .endpoint(url)
             .region(region)
-            .credentials(access_key, secret_key)
+            .credentials(accessKey, secretKey)
             .build();
     }
 
@@ -220,22 +220,22 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
     private void downloadAllItems(
         String bucket,
         String prefix,
-        String local_folder
+        String localFolder
     ) {
         Iterable<Result<Item>> items = listItemsByPrefix(bucket, addTrailingSlashIfNotPresent(prefix));
 
         // Create directory if it does not exist - nio method does not throw if it exists
         try {
-            Path path = Paths.get(local_folder);
+            Path path = Paths.get(localFolder);
             Files.createDirectories(path);
-            getLogger().info("Downloading to " + local_folder);
+            getLogger().info("Downloading to " + localFolder);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
-        items.forEach(main_item -> {
+        items.forEach(mainItem -> {
             try {
-                String objectName = main_item.get().objectName();
+                String objectName = mainItem.get().objectName();
                 getLogger().info("Downloading file " + objectName);
 
                 String[] objNameParts = objectName.split("/");
@@ -246,7 +246,7 @@ public class DownloadMultipleS3FilesByPrefix extends AbstractProcessor {
                         .builder()
                         .bucket(bucket)
                         .object(objectName)
-                        .filename(local_folder + "/" + fileName)
+                        .filename(localFolder + "/" + fileName)
                         .build()
                 );
 
