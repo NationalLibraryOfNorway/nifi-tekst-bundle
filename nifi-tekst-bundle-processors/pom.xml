@@ -17,17 +17,63 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <properties>
+        <kotlin.version>1.9.22</kotlin.version>
+    </properties>
 
     <parent>
         <groupId>no.nb.tekst</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
-        <version>1.0.0</version>
+        <version>1.0.1</version>
     </parent>
 
     <artifactId>nifi-tekst-bundle-processors</artifactId>
+    <description>Custom NiFi processors for productionlines (Team Tekst)</description>
     <packaging>jar</packaging>
 
+    <build>
+        <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
+        <testSourceDirectory>${project.basedir}/src/test/kotlin</testSourceDirectory>
+
+        <plugins>
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+                <version>${kotlin.version}</version>
+
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+
+                    <execution>
+                        <id>test-compile</id>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
     <dependencies>
+        <!-- Kotlin -->
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-script-runtime</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+
+        <!-- NiFi -->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-api</artifactId>
@@ -38,8 +84,16 @@
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-utils</artifactId>
             <version>${nifi.version}</version>
-            <scope>provided</scope>
         </dependency>
+
+        <!-- Minio -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.11</version>
+        </dependency>
+
+        <!-- Test -->
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-mock</artifactId>
@@ -47,20 +101,31 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.minio</groupId>
-            <artifactId>minio</artifactId>
-            <version>8.5.11</version>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.25</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>1.7.25</version>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>1.17.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>minio</artifactId>
+            <version>1.20.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
