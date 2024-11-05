@@ -1,4 +1,4 @@
-package no.nb.processors.tekst
+package no.nb.nifi.tekst.processors
 
 import io.minio.MakeBucketArgs
 import io.minio.MinioClient

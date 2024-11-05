@@ -29,7 +29,7 @@
         <junit.version>5.10.3</junit.version>
     </properties>
 
-    <groupId>no.nb.tekst</groupId>
+    <groupId>no.nb.nifi</groupId>
     <artifactId>nifi-tekst-bundle</artifactId>
     <version>1.0.1</version>
     <packaging>pom</packaging>
@@ -42,7 +42,7 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>no.nb</groupId>
+                <groupId>no.nb.nifi</groupId>
                 <artifactId>nifi-tekst-bundle-processors</artifactId>
                 <version>${project.version}</version>
             </dependency>

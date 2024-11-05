@@ -22,7 +22,7 @@
     </properties>
 
     <parent>
-        <groupId>no.nb.tekst</groupId>
+        <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
         <version>1.0.1</version>
     </parent>

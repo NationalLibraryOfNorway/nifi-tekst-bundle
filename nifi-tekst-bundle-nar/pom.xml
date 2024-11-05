@@ -19,7 +19,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>no.nb.tekst</groupId>
+        <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
         <version>1.0.1</version>
     </parent>
@@ -34,7 +34,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>no.nb.tekst</groupId>
+            <groupId>no.nb.nifi</groupId>
             <artifactId>nifi-tekst-bundle-processors</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
