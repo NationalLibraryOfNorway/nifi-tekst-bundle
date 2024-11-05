@@ -160,7 +160,14 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
         val localFolder = context.getProperty("local_folder").evaluateAttributeExpressions(flowFile).value
 
         client = getS3Client(accessKey, secretKey, region, endpoint)
-        downloadAllItems(bucket, prefix, localFolder)
+
+        try {
+            downloadAllItems(bucket, prefix, localFolder)
+        } catch (e: Exception) {
+            logger.error("Failed to download files", e)
+            session.transfer(flowFile, REL_FAILURE)
+            return
+        }
 
         session.transfer(flowFile, REL_SUCCESS)
     }
@@ -209,7 +216,7 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
     ) {
         println("localFolder: $localFolder")
         val items: MutableIterable<io.minio.Result<Item>>? = listItemsByPrefix(bucket, addTrailingSlashIfNotPresent(prefix))
-        if (items == null) {
+        if (items == null || !items.iterator().hasNext()) {
             logger.error("No items found in bucket $bucket with prefix $prefix")
             throw RuntimeException("No items found in bucket $bucket with prefix $prefix")
         }

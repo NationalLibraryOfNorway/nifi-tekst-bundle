@@ -114,4 +114,30 @@ class DownloadMultipleS3FilesByPrefixTest {
         File(downloadedFilesFolder).delete()
     }
 
+    @Test
+    fun shouldFailWhenObjectDoesNotExist() {
+        val runner = TestRunners.newTestRunner(DownloadMultipleS3FilesByPrefix::class.java)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.BUCKET, BUCKET)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.ACCESS_KEY, ACCESS_KEY)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.SECRET_KEY, SECRET_KEY)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.REGION, REGION)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.PREFIX, "NEWSPAPER/abc")
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.ENDPOINT, minioServerUrl)
+
+        val projectFolder = Paths.get("").toAbsolutePath().toString()
+        val downloadedFilesFolder = "src/test/resources/downloaded-files"
+
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, "$projectFolder/$downloadedFilesFolder")
+
+        runner.enqueue("Hello world")
+
+        runner.run()
+
+        // check that the files are downloaded
+        runner.assertAllFlowFilesTransferred("failure")
+
+        // clean up
+        File(downloadedFilesFolder).delete()
+    }
+
 }
