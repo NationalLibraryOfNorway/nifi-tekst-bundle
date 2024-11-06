@@ -178,9 +178,6 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
         region: String,
         url: String
     ): MinioClient {
-        println("accessKey: $accessKey")
-        println("secretKey: $secretKey")
-        println("endpoint: $url")
         return MinioClient
             .builder()
             .endpoint(url)
@@ -214,7 +211,6 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
         prefix: String,
         localFolder: String
     ) {
-        println("localFolder: $localFolder")
         val items: MutableIterable<io.minio.Result<Item>>? = listItemsByPrefix(bucket, addTrailingSlashIfNotPresent(prefix))
         if (items == null || !items.iterator().hasNext()) {
             logger.error("No items found in bucket $bucket with prefix $prefix")

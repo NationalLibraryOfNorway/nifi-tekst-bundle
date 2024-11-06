@@ -37,7 +37,6 @@ class DownloadMultipleS3FilesByPrefixTest {
                 .withCommand("server /data")
 
             minioContainer.start()
-            println(minioContainer.getFirstMappedPort())
 
             val endpoint = "http://${minioContainer.host}:${minioContainer.getFirstMappedPort()}"
             minioServerUrl = endpoint
