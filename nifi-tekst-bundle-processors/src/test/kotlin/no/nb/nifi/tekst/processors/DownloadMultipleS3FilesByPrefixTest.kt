@@ -131,8 +131,7 @@ class DownloadMultipleS3FilesByPrefixTest {
         runner.enqueue("Hello world")
 
         runner.run()
-
-        // check that the files are downloaded
+        
         runner.assertAllFlowFilesTransferred("failure")
 
         // clean up
