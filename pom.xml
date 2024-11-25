@@ -15,6 +15,11 @@
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.apache.nifi</groupId>
+        <artifactId>nifi-nar-bundles</artifactId>
+        <version>1.22.0</version>
+    </parent>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
@@ -24,9 +29,9 @@
         <junit.version>5.10.3</junit.version>
     </properties>
 
-    <groupId>no.nb.tekst</groupId>
+    <groupId>no.nb.nifi</groupId>
     <artifactId>nifi-tekst-bundle</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -37,9 +42,9 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>no.nb</groupId>
+                <groupId>no.nb.nifi</groupId>
                 <artifactId>nifi-tekst-bundle-processors</artifactId>
-                <version>1.0.0</version>
+                <version>${project.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
