@@ -26,9 +26,9 @@ class JhoveParser(file: File) {
     }
 
     // TODO do we need to set getters?
-    val imageWidth: Int = getValueAsBigInt("//BasicImageInformation/BasicImageCharacteristics/imageWidth") ?: throw MetsCreateException("Unable to get image width")
+    val imageWidth: BigInteger = getValueAsBigInt("//BasicImageInformation/BasicImageCharacteristics/imageWidth") ?: throw MetsCreateException("Unable to get image width")
 
-    val imageHeigth: Int = getValueAsBigInt("//BasicImageInformation/BasicImageCharacteristics/imageHeight") ?: throw MetsCreateException("Unable to get image height")
+    val imageHeigth: BigInteger = getValueAsBigInt("//BasicImageInformation/BasicImageCharacteristics/imageHeight") ?: throw MetsCreateException("Unable to get image height")
 
     @Throws(MetsCreateException::class)
     fun samplingFrequencyUnit(): BigInteger? =

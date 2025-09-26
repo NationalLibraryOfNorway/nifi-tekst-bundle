@@ -125,6 +125,54 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- JHOVE -->
+        <dependency>
+            <groupId>org.openpreservation.jhove</groupId>
+            <artifactId>jhove-core</artifactId>
+            <version>1.26.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove.modules</groupId>
+            <artifactId>jhove-modules</artifactId>
+            <version>1.26.1</version>
+            <type>pom</type>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove</groupId>
+            <artifactId>jhove-ext-modules</artifactId>
+            <version>1.26.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove.modules</groupId>
+            <artifactId>jpeg-hul</artifactId>
+            <version>1.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove.modules</groupId>
+            <artifactId>jpeg2000-hul</artifactId>
+            <version>1.4.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove.modules</groupId>
+            <artifactId>pdf-hul</artifactId>
+            <version>1.12.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove.modules</groupId>
+            <artifactId>tiff-hul</artifactId>
+            <version>1.9.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove.modules</groupId>
+            <artifactId>wave-hul</artifactId>
+            <version>1.8.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openpreservation.jhove.modules</groupId>
+            <artifactId>xml-hul</artifactId>
+            <version>1.5.2</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.apache.nifi</groupId>
