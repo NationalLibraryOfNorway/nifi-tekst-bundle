@@ -35,12 +35,12 @@ data class TagFather(override var name: String, override val attributes: Mutable
 
     override fun render(margin: Int): String = StringBuilder().apply {
         if (declaration != null) {
-            appendln(declaration)
+            appendLine(declaration)
             declaration = null
         }
-        appendln(TAB.repeat(margin) + renderStartTeg(tags.isEmpty()))
+        appendLine(TAB.repeat(margin) + renderStartTeg(tags.isEmpty()))
         if (tags.isNotEmpty()) {
-            tags.forEach { appendln(it.render(margin + 1)) }
+            tags.forEach { appendLine(it.render(margin + 1)) }
             append(TAB.repeat(margin) + "</$name>")
         }
     }.toString().replace(RN + RN, RN) // WTF?

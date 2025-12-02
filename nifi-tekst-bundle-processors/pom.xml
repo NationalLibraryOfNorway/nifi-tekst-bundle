@@ -24,7 +24,7 @@
     <parent>
         <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
-        <version>1.0.1</version>
+        <version>1.1.1</version>
     </parent>
 
     <artifactId>nifi-tekst-bundle-processors</artifactId>
@@ -115,14 +115,15 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
-            <version>1.17.6</version>
             <scope>test</scope>
+            <version>2.0.2</version>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>minio</artifactId>
-            <version>1.20.3</version>
+            <version>1.21.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
 </project>
