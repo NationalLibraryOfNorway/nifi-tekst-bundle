@@ -2,6 +2,7 @@ package no.nb.nifi.tekst.processors
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.apache.nifi.util.TestRunner
 import org.apache.nifi.util.TestRunners
 import org.junit.Test
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -152,4 +153,52 @@ class GenerateJsonFromPropsTest {
         assertEquals("eng", title.get("lang").asText())
     }
 
+    @Test
+    fun `array object and primitive elements`() {
+        val runner: TestRunner = TestRunners.newTestRunner(GenerateJsonFromProps::class.java)
+
+        runner.setProperty(GenerateJsonFromProps.OUTPUT_MODE, "discard")
+
+        // create an object at items[0] and a primitive at items[1]
+        runner.setProperty("items[0].name", "First")
+        runner.setProperty("items[1]", "second-primitive")
+
+        runner.enqueue("noop")
+        runner.run()
+
+        runner.assertAllFlowFilesTransferred(GenerateJsonFromProps.REL_SUCCESS, 1)
+        val out = runner.getFlowFilesForRelationship(GenerateJsonFromProps.REL_SUCCESS)[0]
+
+        val content = String(out.toByteArray(), StandardCharsets.UTF_8)
+        val json = mapper.readTree(content)
+
+        assertEquals(2, json.get("items").size())
+        assertEquals("First", json.get("items").get(0).get("name").asText())
+        assertEquals("second-primitive", json.get("items").get(1).asText())
+    }
+
+    @Test
+    fun `merge overwrites arrays`() {
+        val runner: TestRunner = TestRunners.newTestRunner(GenerateJsonFromProps::class.java)
+
+        runner.setProperty(GenerateJsonFromProps.OUTPUT_MODE, "merge")
+
+        val initial = "{" + "\"items\": [{\"name\": \"Old\"}]" + "}"
+        runner.enqueue(initial.toByteArray(StandardCharsets.UTF_8))
+
+        // This will generate a new items array; merge semantics overwrite arrays
+        runner.setProperty("items[0].age", "30")
+
+        runner.run()
+
+        runner.assertAllFlowFilesTransferred(GenerateJsonFromProps.REL_SUCCESS, 1)
+        val out = runner.getFlowFilesForRelationship(GenerateJsonFromProps.REL_SUCCESS)[0]
+
+        val content = String(out.toByteArray(), StandardCharsets.UTF_8)
+        val json = mapper.readTree(content)
+
+        // arrays are overwritten by generated JSON -> only the new array element exists
+        assertEquals(1, json.get("items").size())
+        assertEquals("30", json.get("items").get(0).get("age").asText())
+    }
 }

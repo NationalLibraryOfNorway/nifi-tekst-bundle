@@ -2,6 +2,7 @@ package no.nb.nifi.tekst.processors
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.ObjectNode
 import org.apache.nifi.annotation.behavior.DynamicProperty
@@ -34,8 +35,8 @@ import java.util.HashSet
 @Tags("NB", "Tekst", "Text", "Generate", "JSON")
 @CapabilityDescription(
     "Generates nested JSON from dynamic processor properties with dotted names. " +
-            "Writes JSON to the FlowFile content. output_mode decides whether " +
-            "to discard or merge with existing JSON in the FlowFile."
+            "Writes JSON to the FlowFile content. output_mode decides whether to discard or merge with existing JSON in the FlowFile. " +
+            "Supports arrays using bracket-index syntax (e.g. items[0].name) to create JSON lists; when merging, object fields are merged recursively, but arrays and non-object nodes are overwritten by the generated values."
 )
 @SideEffectFree
 class GenerateJsonFromProps : AbstractProcessor() {
@@ -127,7 +128,7 @@ class GenerateJsonFromProps : AbstractProcessor() {
                     continue
                 }
 
-                val path = descriptor.name        // f.eks "metadata.title.value"
+                val path = descriptor.name        // e.g. "metadata.title.value"
                 val value = context.getProperty(descriptor)
                     .evaluateAttributeExpressions(flowFile)
                     .value
@@ -198,22 +199,84 @@ class GenerateJsonFromProps : AbstractProcessor() {
      */
     private fun putNested(root: ObjectNode, path: String, value: String, factory: JsonNodeFactory) {
         val parts = path.split('.')
-        var current: ObjectNode = root
+        var current: JsonNode = root
+
+        val arrayRegex = Regex("^(.+)\\[(\\d+)]$")
 
         for (i in 0 until parts.size - 1) {
-            val key = parts[i]
-            val child = current.get(key)
-            current = if (child is ObjectNode) {
-                child
+            val segment = parts[i]
+            val arrayMatch = arrayRegex.find(segment)
+
+            if (arrayMatch != null) {
+                val key = arrayMatch.groupValues[1]
+                val index = arrayMatch.groupValues[2].toInt()
+
+                // current must be an ObjectNode to hold a named array
+                if (current is ObjectNode) {
+                    val existing = current.get(key)
+                    val arr = if (existing is ArrayNode) existing else {
+                        val newArr = factory.arrayNode()
+                        current.set<JsonNode>(key, newArr)
+                        newArr
+                    }
+
+                    // ensure array has element at index
+                    while (arr.size() <= index) arr.addNull()
+
+                    val elem = arr.get(index)
+                    if (elem is ObjectNode) {
+                        current = elem
+                    } else {
+                        val newObj = factory.objectNode()
+                        arr.set(index, newObj)
+                        current = newObj
+                    }
+                } else {
+                    // unexpected structure: overwrite with object containing array
+                    val replacement = factory.objectNode()
+                    current = replacement
+                }
             } else {
-                val newChild = factory.objectNode()
-                current.set<ObjectNode>(key, newChild)
-                newChild
+                // plain object key
+                if (current is ObjectNode) {
+                    val child = current.get(segment)
+                    current = if (child is ObjectNode) {
+                        child
+                    } else {
+                        val newChild = factory.objectNode()
+                        current.set<JsonNode>(segment, newChild)
+                        newChild
+                    }
+                } else {
+                    // unexpected: create a new object and continue
+                    val newObj = factory.objectNode()
+                    current = newObj
+                }
             }
         }
 
-        val lastKey = parts.last()
-        current.put(lastKey, value)
+        // handle last segment (set the value)
+        val last = parts.last()
+        val lastArrayMatch = arrayRegex.find(last)
+        if (lastArrayMatch != null) {
+            val key = lastArrayMatch.groupValues[1]
+            val index = lastArrayMatch.groupValues[2].toInt()
+
+            if (current is ObjectNode) {
+                val existing = current.get(key)
+                val arr = if (existing is ArrayNode) existing else {
+                    val newArr = factory.arrayNode()
+                    current.set<JsonNode>(key, newArr)
+                    newArr
+                }
+                while (arr.size() <= index) arr.addNull()
+                arr.set(index, factory.textNode(value))
+            }
+        } else {
+            if (current is ObjectNode) {
+                current.put(last, value)
+            }
+        }
     }
 
     /**
