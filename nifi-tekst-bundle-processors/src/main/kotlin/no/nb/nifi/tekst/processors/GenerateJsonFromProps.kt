@@ -144,7 +144,7 @@ class GenerateJsonFromProps : AbstractProcessor() {
             } else {
                 overwriteContent(flowFile, session, newRoot)
             }
-
+            flowFile = session.putAttribute(flowFile, "mime.type", "application/json")
             session.transfer(flowFile, REL_SUCCESS)
         } catch (e: Exception) {
             logger.error("Failed to generate JSON", e)

@@ -21,7 +21,7 @@
     <parent>
         <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
-        <version>1.1.1</version>
+        <version>1.1.2</version>
     </parent>
 
     <artifactId>nifi-tekst-bundle-nar</artifactId>
@@ -39,8 +39,18 @@
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-standard-services-api-nar</artifactId>
-            <version>2.3.0</version>
+            <version>${nifi.version}</version>
             <type>nar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+            <version>2.1.10</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-script-runtime</artifactId>
+            <version>2.1.10</version>
         </dependency>
     </dependencies>
 </project>

@@ -24,7 +24,7 @@
     <parent>
         <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
-        <version>1.1.1</version>
+        <version>1.1.2</version>
     </parent>
 
     <artifactId>nifi-tekst-bundle-processors</artifactId>
@@ -112,12 +112,13 @@
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-api</artifactId>
-            <version>2.0.0</version>
+            <version>${nifi.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-utils</artifactId>
+            <version>${nifi.version}</version>
         </dependency>
         <!-- Minio -->
         <dependency>
