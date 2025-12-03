@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import org.apache.nifi.annotation.behavior.DynamicProperty
 import org.apache.nifi.annotation.behavior.SideEffectFree
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
+import org.apache.nifi.annotation.behavior.WritesAttribute
 import org.apache.nifi.annotation.documentation.CapabilityDescription
 import org.apache.nifi.annotation.documentation.Tags
 import org.apache.nifi.components.AllowableValue
@@ -38,6 +39,9 @@ import java.util.HashSet
             "Writes JSON to the FlowFile content. output_mode decides whether to discard or merge with existing JSON in the FlowFile. " +
             "Supports arrays using bracket-index syntax (e.g. items[0].name) to create JSON lists; when merging, object fields are merged recursively, but arrays and non-object nodes are overwritten by the generated values."
 )
+@WritesAttribute(
+    attribute = "mime.type",
+    description = "Sets mime.type attribute to application/json")
 @SideEffectFree
 class GenerateJsonFromProps : AbstractProcessor() {
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
@@ -57,6 +61,27 @@ class GenerateJsonFromProps : AbstractProcessor() {
             "Merge with existing JSON",
             "Read existing FlowFile content as JSON and merge with generated JSON."
         )
+
+        private val OUTPUT_PRETTY = AllowableValue(
+            "pretty",
+            "Pretty print",
+            "Output JSON with indentation and line breaks."
+        )
+
+        private val OUTPUT_COMPACT = AllowableValue(
+            "compact",
+            "Compact",
+            "Output JSON without extra whitespace."
+        )
+
+        val JSON_OUTPUT_FORMAT: PropertyDescriptor = PropertyDescriptor.Builder()
+            .name("json_output_format")
+            .displayName("JSON output format")
+            .description("Choose whether to output pretty-printed or compact JSON.")
+            .allowableValues(OUTPUT_PRETTY, OUTPUT_COMPACT)
+            .defaultValue(OUTPUT_COMPACT.value)
+            .required(true)
+            .build()
 
         val OUTPUT_MODE: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("output_mode")
@@ -80,6 +105,7 @@ class GenerateJsonFromProps : AbstractProcessor() {
 
     override fun init(context: ProcessorInitializationContext) {
         descriptors.add(OUTPUT_MODE)
+        descriptors.add(JSON_OUTPUT_FORMAT)
         descriptors = Collections.unmodifiableList(descriptors)
 
         relationships = HashSet<Relationship>().apply {
@@ -119,7 +145,6 @@ class GenerateJsonFromProps : AbstractProcessor() {
         val newRoot: ObjectNode = factory.objectNode()
 
         try {
-            // Build JSON from dynamic properties only (skip known static descriptors)
             val staticDescriptors = descriptors.toSet()
             val allProps: Map<PropertyDescriptor, String> = context.properties
 
@@ -138,55 +163,45 @@ class GenerateJsonFromProps : AbstractProcessor() {
                 }
             }
 
-            // Decide how to write to FlowFile
-            flowFile = if (outputMode == MODE_MERGE.value) {
-                mergeWithExisting(flowFile, session, mapper, factory, newRoot)
-            } else {
-                overwriteContent(flowFile, session, newRoot)
-            }
-            flowFile = session.putAttribute(flowFile, "mime.type", "application/json")
-            session.transfer(flowFile, REL_SUCCESS)
-        } catch (e: Exception) {
-            logger.error("Failed to generate JSON", e)
-            session.transfer(flowFile, REL_FAILURE)
-        }
-    }
+            val finalJson: JsonNode = if (outputMode == MODE_MERGE.value) {
+                // read existing content into a local variable; session.read's callback doesn't return the value
+                var existingStr = ""
+                session.read(flowFile) { input ->
+                    existingStr = input.bufferedReader(StandardCharsets.UTF_8).readText()
+                }
 
-    private fun overwriteContent(
-        flowFile: FlowFile,
-        session: ProcessSession,
-        newRoot: ObjectNode
-    ): FlowFile {
-        val jsonBytes = newRoot.toString().toByteArray(StandardCharsets.UTF_8)
-        return session.write(flowFile) { out ->
-            out.write(jsonBytes)
-        }
-    }
-
-    private fun mergeWithExisting(
-        flowFile: FlowFile,
-        session: ProcessSession,
-        mapper: ObjectMapper,
-        factory: JsonNodeFactory,
-        newRoot: ObjectNode
-    ): FlowFile {
-        return session.write(flowFile) { input, output ->
-            val existingStr = input.bufferedReader(StandardCharsets.UTF_8).readText()
-
-            val existingNode: JsonNode = if (existingStr.isNotBlank()) {
-                try {
-                    mapper.readTree(existingStr)
-                } catch (e: IOException) {
-                    // Not valid JSON, treat as empty object
-                    logger.warn("Existing content is not valid JSON, overwriting", e)
+                val existingNode: JsonNode = if (existingStr.isNotBlank()) {
+                    try {
+                        mapper.readTree(existingStr)
+                    } catch (exception: IOException) {
+                        logger.warn("Existing content is not valid JSON, will overwrite with generated JSON", exception)
+                        factory.objectNode()
+                    }
+                } else {
                     factory.objectNode()
                 }
+
+                mergeJson(existingNode, newRoot, factory)
             } else {
-                factory.objectNode()
+                newRoot as JsonNode
             }
 
-            val merged = mergeJson(existingNode, newRoot, factory)
-            output.write(merged.toString().toByteArray(StandardCharsets.UTF_8))
+            val format = context.getProperty(JSON_OUTPUT_FORMAT).value ?: OUTPUT_COMPACT.value
+            val jsonString = if (format == OUTPUT_PRETTY.value) {
+                mapper.writerWithDefaultPrettyPrinter().writeValueAsString(finalJson)
+            } else {
+                mapper.writeValueAsString(finalJson)
+            }
+
+            flowFile = session.write(flowFile) { out ->
+                out.write(jsonString.toByteArray(StandardCharsets.UTF_8))
+            }
+
+            flowFile = session.putAttribute(flowFile, "mime.type", "application/json")
+            session.transfer(flowFile, REL_SUCCESS)
+        } catch (exception: Exception) {
+            logger.error("Failed to generate JSON", exception)
+            session.transfer(flowFile, REL_FAILURE)
         }
     }
 
