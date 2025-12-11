@@ -17,8 +17,8 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.apache.nifi</groupId>
-        <artifactId>nifi-nar-bundles</artifactId>
-        <version>2.0.0-M2</version>
+        <artifactId>nifi-extension-bundles</artifactId>
+        <version>2.3.0</version>
     </parent>
 
     <properties>
@@ -31,7 +31,7 @@
 
     <groupId>no.nb.nifi</groupId>
     <artifactId>nifi-tekst-bundle</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.2</version>
     <packaging>pom</packaging>
 
     <modules>

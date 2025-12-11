@@ -8,3 +8,12 @@ target/
 *.iws
 *.iml
 *.ipr
+
+### Test files ###
+pliktmonografi*
+METS.xml
+*.db
+*.md5
+
+### Other ###
+.sdkmanrc
