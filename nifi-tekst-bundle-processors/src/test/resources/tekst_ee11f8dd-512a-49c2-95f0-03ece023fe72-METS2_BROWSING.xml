@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mets:mets xmlns:mets="http://www.loc.gov/METS/v2" xmlns:mix="http://www.loc.gov/mix/v20" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" OBJID="tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72" xsi:schemaLocation="http://www.loc.gov/METS/v2 https://loc.gov/standards/mets/mets2.xsd http://www.loc.gov/mix/v20 https://www.loc.gov/standards/mix/mix.xsd">
+  <mets:metsHdr CREATEDATE="2026-01-06T13:23:34.071771663Z" LASTMODDATE="2026-01-06T13:23:34.071771663Z">
+    <mets:agent ROLE="CREATOR" TYPE="Software">
+      <mets:name>MetsBrowsingGenerator v2</mets:name>
+    </mets:agent>
+  </mets:metsHdr>
+  <mets:mdSec>
+    <mets:md ID="JPEG2000_ENCODING" USE="TECHNICAL">
+      <mets:mdWrap MDTYPE="NISOIMG">
+        <mets:xmlData>
+          <mix:mix>
+            <mix:BasicImageInformation>
+              <mix:SpecialFormatCharacteristics>
+                <mix:JPEG2000>
+                  <mix:EncodingOptions>
+                    <mix:Tiles>
+                      <mix:tileWidth>1024</mix:tileWidth>
+                      <mix:tileHeight>1024</mix:tileHeight>
+                    </mix:Tiles>
+                    <mix:qualityLayers>13</mix:qualityLayers>
+                    <mix:resolutionLevels>6</mix:resolutionLevels>
+                  </mix:EncodingOptions>
+                </mix:JPEG2000>
+              </mix:SpecialFormatCharacteristics>
+            </mix:BasicImageInformation>
+          </mix:mix>
+        </mets:xmlData>
+      </mets:mdWrap>
+    </mets:md>
+    <mets:md ID="RESOLUTION_P0001" USE="TECHNICAL">
+      <mets:mdWrap MDTYPE="NISOIMG">
+        <mets:xmlData>
+          <mix:mix>
+            <mix:BasicImageInformation>
+              <mix:BasicImageCharacteristics>
+                <mix:imageWidth>7133</mix:imageWidth>
+                <mix:imageHeight>8619</mix:imageHeight>
+              </mix:BasicImageCharacteristics>
+            </mix:BasicImageInformation>
+            <mix:ImageAssessmentMetadata>
+              <mix:SpatialMetrics>
+                <mix:samplingFrequencyUnit>cm</mix:samplingFrequencyUnit>
+                <mix:xSamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:xSamplingFrequency>
+                <mix:ySamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:ySamplingFrequency>
+              </mix:SpatialMetrics>
+            </mix:ImageAssessmentMetadata>
+          </mix:mix>
+        </mets:xmlData>
+      </mets:mdWrap>
+    </mets:md>
+    <mets:md ID="RESOLUTION_P0002" USE="TECHNICAL">
+      <mets:mdWrap MDTYPE="NISOIMG">
+        <mets:xmlData>
+          <mix:mix>
+            <mix:BasicImageInformation>
+              <mix:BasicImageCharacteristics>
+                <mix:imageWidth>7151</mix:imageWidth>
+                <mix:imageHeight>8605</mix:imageHeight>
+              </mix:BasicImageCharacteristics>
+            </mix:BasicImageInformation>
+            <mix:ImageAssessmentMetadata>
+              <mix:SpatialMetrics>
+                <mix:samplingFrequencyUnit>cm</mix:samplingFrequencyUnit>
+                <mix:xSamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:xSamplingFrequency>
+                <mix:ySamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:ySamplingFrequency>
+              </mix:SpatialMetrics>
+            </mix:ImageAssessmentMetadata>
+          </mix:mix>
+        </mets:xmlData>
+      </mets:mdWrap>
+    </mets:md>
+    <mets:md ID="RESOLUTION_P0003" USE="TECHNICAL">
+      <mets:mdWrap MDTYPE="NISOIMG">
+        <mets:xmlData>
+          <mix:mix>
+            <mix:BasicImageInformation>
+              <mix:BasicImageCharacteristics>
+                <mix:imageWidth>7187</mix:imageWidth>
+                <mix:imageHeight>8663</mix:imageHeight>
+              </mix:BasicImageCharacteristics>
+            </mix:BasicImageInformation>
+            <mix:ImageAssessmentMetadata>
+              <mix:SpatialMetrics>
+                <mix:samplingFrequencyUnit>cm</mix:samplingFrequencyUnit>
+                <mix:xSamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:xSamplingFrequency>
+                <mix:ySamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:ySamplingFrequency>
+              </mix:SpatialMetrics>
+            </mix:ImageAssessmentMetadata>
+          </mix:mix>
+        </mets:xmlData>
+      </mets:mdWrap>
+    </mets:md>
+    <mets:md ID="RESOLUTION_P0004" USE="TECHNICAL">
+      <mets:mdWrap MDTYPE="NISOIMG">
+        <mets:xmlData>
+          <mix:mix>
+            <mix:BasicImageInformation>
+              <mix:BasicImageCharacteristics>
+                <mix:imageWidth>7142</mix:imageWidth>
+                <mix:imageHeight>8598</mix:imageHeight>
+              </mix:BasicImageCharacteristics>
+            </mix:BasicImageInformation>
+            <mix:ImageAssessmentMetadata>
+              <mix:SpatialMetrics>
+                <mix:samplingFrequencyUnit>cm</mix:samplingFrequencyUnit>
+                <mix:xSamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:xSamplingFrequency>
+                <mix:ySamplingFrequency>
+                  <mix:numerator>4000000</mix:numerator>
+                  <mix:denominator>25400</mix:denominator>
+                </mix:ySamplingFrequency>
+              </mix:SpatialMetrics>
+            </mix:ImageAssessmentMetadata>
+          </mix:mix>
+        </mets:xmlData>
+      </mets:mdWrap>
+    </mets:md>
+  </mets:mdSec>
+  <mets:fileSec>
+    <mets:fileGrp ID="BROWSINGGRP" USE="BROWSING">
+      <mets:file ID="DO_0001" SEQ="1">
+        <mets:file CHECKSUM="3ff0817548b505c563b354a6e84d2f57" CHECKSUMTYPE="MD5" ID="ALTO_0001" MIMETYPE="application/xml" SIZE="772852" USE="layout">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_001" LOCTYPE="URN"/>
+        </mets:file>
+        <mets:file CHECKSUM="4140bce833dc3a0814bfed8f9b747f29" CHECKSUMTYPE="MD5" ID="DO_0001_003" MDID="JPEG2000_ENCODING RESOLUTION_P0001" MIMETYPE="image/jp2" SIZE="7766719" USE="browsing">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_001" LOCTYPE="URN"/>
+        </mets:file>
+      </mets:file>
+      <mets:file ID="DO_0002" SEQ="2">
+        <mets:file CHECKSUM="612077a66b69ec80997d3b28d2104824" CHECKSUMTYPE="MD5" ID="ALTO_0002" MIMETYPE="application/xml" SIZE="700497" USE="layout">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_002" LOCTYPE="URN"/>
+        </mets:file>
+        <mets:file CHECKSUM="2e42c01901f1333bcae5ad4aeca932fe" CHECKSUMTYPE="MD5" ID="DO_0002_003" MDID="JPEG2000_ENCODING RESOLUTION_P0002" MIMETYPE="image/jp2" SIZE="7759370" USE="browsing">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_002" LOCTYPE="URN"/>
+        </mets:file>
+      </mets:file>
+      <mets:file ID="DO_0003" SEQ="3">
+        <mets:file CHECKSUM="53bfa8924e67621e30078d0daa87e343" CHECKSUMTYPE="MD5" ID="ALTO_0003" MIMETYPE="application/xml" SIZE="411832" USE="layout">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_003" LOCTYPE="URN"/>
+        </mets:file>
+        <mets:file CHECKSUM="441bc8d929b67996006535caaa8a81c9" CHECKSUMTYPE="MD5" ID="DO_0003_003" MDID="JPEG2000_ENCODING RESOLUTION_P0003" MIMETYPE="image/jp2" SIZE="7869959" USE="browsing">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_003" LOCTYPE="URN"/>
+        </mets:file>
+      </mets:file>
+      <mets:file ID="DO_0004" SEQ="4">
+        <mets:file CHECKSUM="bb3697c6175ef1b3f8b3af1886f4d0bb" CHECKSUMTYPE="MD5" ID="ALTO_0004" MIMETYPE="application/xml" SIZE="448279" USE="layout">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_004" LOCTYPE="URN"/>
+        </mets:file>
+        <mets:file CHECKSUM="7c5903892316aedbcd7034fee66a4bf7" CHECKSUMTYPE="MD5" ID="DO_0004_003" MDID="JPEG2000_ENCODING RESOLUTION_P0004" MIMETYPE="image/jp2" SIZE="7745315" USE="browsing">
+          <mets:FLocat LOCREF="URN:NBN:no-nb_tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_004" LOCTYPE="URN"/>
+        </mets:file>
+      </mets:file>
+    </mets:fileGrp>
+  </mets:fileSec>
+  <mets:structSec>
+    <mets:structMap TYPE="PHYSICAL">
+      <mets:div TYPE="PAGES">
+        <mets:div ID="DIV1" ORDER="1" ORDERLABEL="1" TYPE="PAGE">
+          <mets:fptr>
+            <mets:par>
+              <mets:area FILEID="ALTO_0001"/>
+            </mets:par>
+          </mets:fptr>
+          <mets:fptr FILEID="DO_0001_003"/>
+        </mets:div>
+        <mets:div ID="DIV2" ORDER="2" ORDERLABEL="2" TYPE="PAGE">
+          <mets:fptr>
+            <mets:par>
+              <mets:area FILEID="ALTO_0002"/>
+            </mets:par>
+          </mets:fptr>
+          <mets:fptr FILEID="DO_0002_003"/>
+        </mets:div>
+        <mets:div ID="DIV3" ORDER="3" ORDERLABEL="3" TYPE="PAGE">
+          <mets:fptr>
+            <mets:par>
+              <mets:area FILEID="ALTO_0003"/>
+            </mets:par>
+          </mets:fptr>
+          <mets:fptr FILEID="DO_0003_003"/>
+        </mets:div>
+        <mets:div ID="DIV4" ORDER="4" ORDERLABEL="4" TYPE="PAGE">
+          <mets:fptr>
+            <mets:par>
+              <mets:area FILEID="ALTO_0004"/>
+            </mets:par>
+          </mets:fptr>
+          <mets:fptr FILEID="DO_0004_003"/>
+        </mets:div>
+      </mets:div>
+    </mets:structMap>
+  </mets:structSec>
+</mets:mets>
