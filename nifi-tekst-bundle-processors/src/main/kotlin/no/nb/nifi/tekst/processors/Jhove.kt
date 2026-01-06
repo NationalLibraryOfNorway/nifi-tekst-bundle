@@ -1,54 +1,47 @@
 package no.nb.nifi.tekst.processors
 
-import com.google.common.collect.ImmutableList
-import com.google.common.collect.ImmutableSet
 import edu.harvard.hul.ois.jhove.App
 import edu.harvard.hul.ois.jhove.JhoveBase
 import no.nb.nifi.tekst.exceptions.RoutedException
-import no.nb.nifi.tekst.util.AbstractRoutedProcessor
+import no.nb.nifi.tekst.util.NiFiAttributes
+import no.nb.nifi.tekst.validation.XsdValidator
 import org.apache.nifi.annotation.behavior.*
 import org.apache.nifi.annotation.documentation.CapabilityDescription
 import org.apache.nifi.annotation.documentation.Tags
 import org.apache.nifi.components.AllowableValue
 import org.apache.nifi.components.PropertyDescriptor
-import org.apache.nifi.components.Validator
 import org.apache.nifi.expression.ExpressionLanguageScope
-import org.apache.nifi.processor.ProcessContext
-import org.apache.nifi.processor.ProcessSession
-import org.apache.nifi.processor.ProcessorInitializationContext
-import org.apache.nifi.processor.Relationship
+import org.apache.nifi.processor.*
 import org.apache.nifi.processor.util.StandardValidators
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.*
 import javax.xml.namespace.NamespaceContext
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.xpath.XPathFactory
-import no.nb.nifi.tekst.util.NiFiAttributes
-import org.apache.nifi.components.ConfigVerificationResult
-import org.apache.nifi.flowfile.FlowFile
-import org.apache.nifi.logging.ComponentLog
-import org.apache.nifi.processor.exception.ProcessException
 
 @Tags("NB", "Validation", "JHOVE")
 @CapabilityDescription(
     ("Validates a file with JHOVE. " +
-            "Note that to force XML output complient with MIX10, and hence compatible with task-mets, " +
-            "add <mixVersion>1.0</mixVersion> to jhove.conf")
+            "Note that to force XML output complient with MIX10, and hence compatible with CreateMetsBrowsing, " +
+            "we've added <mixVersion>1.0</mixVersion> to jhoveconf.xml")
 )
 @ReadsAttributes(ReadsAttribute(attribute = NiFiAttributes.FILENAME, description = ""))
 @WritesAttributes(
     WritesAttribute(attribute = NiFiAttributes.FILENAME, description = ""),
-    WritesAttribute(attribute = NiFiAttributes.COMPONENT_IDENTIFIER, description = ""),
-    WritesAttribute(attribute = NiFiAttributes.COMPONENT_TYPE, description = ""),
-    WritesAttribute(attribute = NiFiAttributes.COMPONENT_COUNT, description = "")
+    WritesAttribute(attribute = NiFiAttributes.MIME_TYPE, description = ""),
+    WritesAttribute(attribute = NiFiAttributes.FILE_SIZE, description = ""),
 )
 @SideEffectFree
 @SupportsBatching
-class Jhove : AbstractRoutedProcessor() {
+class Jhove : AbstractProcessor() {
     private var errorMessage: String? = null
+    private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
+    private var relationships: MutableSet<Relationship> = mutableSetOf()
+    private lateinit var configFilePath: String
 
     companion object {
         /** Application name.  */
@@ -68,25 +61,31 @@ class Jhove : AbstractRoutedProcessor() {
         private const val WELL_FORMED_NOT_VALID = "Well-Formed, but not valid"
         private const val WELL_FORMED = "Well-Formed"
 
+        // JHOVE Module allowable values
+        val MODULE_AIFF = AllowableValue("AIFF-hul", "AIFF", "Audio Interchange File Format")
+        val MODULE_ASCII = AllowableValue("ASCII-hul", "ASCII", "ASCII text")
+        val MODULE_GIF = AllowableValue("gif-hul", "GIF", "Graphics Interchange Format")
+        val MODULE_HTML = AllowableValue("HTML-hul", "HTML", "HyperText Markup Language")
+        val MODULE_JPEG = AllowableValue("JPEG-hul", "JPEG", "JPEG image")
+        val MODULE_JPEG2000 = AllowableValue("JPEG2000-hul", "JPEG2000", "JPEG 2000 image")
+        val MODULE_PDF = AllowableValue("PDF-hul", "PDF", "Portable Document Format")
+        val MODULE_TIFF = AllowableValue("TIFF-hul", "TIFF", "Tagged Image File Format")
+        val MODULE_UTF8 = AllowableValue("UTF8-hul", "UTF-8", "UTF-8 encoded text")
+        val MODULE_XML = AllowableValue("XML-hul", "XML", "Extensible Markup Language")
+        val MODULE_PNG = AllowableValue("PNG-gdm", "PNG", "Portable Network Graphics")
+
         val MODULE: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("JHOVE module")
-            .description(
-                "Name of JHOVE module. Allowable values: AIFF-hul, ASCII-hul, JPEG-hul, gif-hul, " +
-                        "HTML-hul, JPEG2000-hul, PDF-hul, TIFF-hul, UTF8-hul, XML-hul, PNG-gdm"
-            )
+            .description("The JHOVE module to use for file validation")
             .required(true)
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .allowableValues(
+                MODULE_AIFF, MODULE_ASCII, MODULE_GIF, MODULE_HTML, MODULE_JPEG,
+                MODULE_JPEG2000, MODULE_PDF, MODULE_TIFF, MODULE_UTF8, MODULE_XML, MODULE_PNG
+            )
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .build()
 
-        val CONFIG_PATH: PropertyDescriptor = PropertyDescriptor.Builder()
-            .name("Config path")
-            .description("Path to jhove.conf")
-            .required(true)
-            .defaultValue("\${config.path}/jhove.conf")
-            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .build()
+        private const val JHOVE_CONFIG_RESOURCE = "/jhoveconf.xml"
 
         val OUTPUT_PATH: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("Output folder path")
@@ -104,18 +103,12 @@ class Jhove : AbstractRoutedProcessor() {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build()
 
-        val COMPONENT_TYPE: PropertyDescriptor = PropertyDescriptor.Builder()
-            .name("Component type")
-            .description("Component type attribute to assign the the JHOVE xml flowfile")
-            .addValidator(Validator.VALID)
-            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-            .build()
-
         val CONTINUE_ON_ERROR: AllowableValue = AllowableValue(
             "continue",
             "Continue on error",
             "Route XML output to success regardless of JHOVE status"
         )
+
         val FAIL_ON_ERROR: AllowableValue = AllowableValue(
             "fail",
             "Fail on error",
@@ -152,30 +145,47 @@ class Jhove : AbstractRoutedProcessor() {
             .build()
     }
 
-    override fun init(context: ProcessorInitializationContext?) {
-        properties = ImmutableList.builder<PropertyDescriptor>()
-            .add(INPUT_PATH)
-            .add(OUTPUT_PATH)
-            .add(MODULE)
-            .add(CONFIG_PATH)
-            .add(COMPONENT_TYPE)
-            .add(BEHAVIOUR_ON_ERROR)
-            .build()
+    override fun init(context: ProcessorInitializationContext) {
+        descriptors.add(INPUT_PATH)
+        descriptors.add(OUTPUT_PATH)
+        descriptors.add(MODULE)
+        descriptors.add(BEHAVIOUR_ON_ERROR)
+        descriptors = Collections.unmodifiableList(descriptors)
 
-        relationships = ImmutableSet.builder<Relationship>()
-            .add(SUCCESS_RELATIONSHIP)
-            .add(WELLFORMED_RELATIONSHIP)
-            .add(FAIL_RELATIONSHIP)
-            .add(JHOVE_OUTPUT_RELATIONSHIP)
-            .build()
+        relationships = HashSet()
+        relationships.add(SUCCESS_RELATIONSHIP)
+        relationships.add(WELLFORMED_RELATIONSHIP)
+        relationships.add(FAIL_RELATIONSHIP)
+        relationships.add(JHOVE_OUTPUT_RELATIONSHIP)
+        relationships = Collections.unmodifiableSet(relationships)
+
+        // Load config from classpath resource and copy to temp file once
+        val configStream = javaClass.getResourceAsStream(JHOVE_CONFIG_RESOURCE)
+            ?: throw IllegalStateException("Could not load JHOVE config from classpath")
+        val tempConfigFile = Files.createTempFile("jhove-config", ".xml")
+        tempConfigFile.toFile().deleteOnExit()
+        configStream.use { inputStream ->
+            Files.copy(inputStream, tempConfigFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+        configFilePath = tempConfigFile.toString()
     }
 
-    override fun verify(p0: ProcessContext?, p1: ComponentLog?, p2: MutableMap<String, String>?): MutableList<ConfigVerificationResult> {
-        TODO("Not yet implemented")
+    override fun getRelationships(): Set<Relationship> {
+        return relationships
+    }
+
+    override fun getSupportedPropertyDescriptors(): List<PropertyDescriptor> {
+        return descriptors
     }
 
     @Throws(RoutedException::class)
-    private fun runJhove(inputFile: Path, outputFile: Path, moduleName: String, configPath: String, errorMode: String): Int {
+    private fun runJhove(
+        inputFile: Path,
+        outputFile: Path,
+        moduleName: String,
+        configPath: String,
+        errorMode: String
+    ): Int {
         getLogger().info("Starting Jhove on file $inputFile")
 
         try {
@@ -234,25 +244,18 @@ class Jhove : AbstractRoutedProcessor() {
         }
     }
 
-    override fun onTrigger(flowFile: FlowFile?, context: ProcessContext?, session: ProcessSession?) {
-        if (flowFile == null) {
-            throw ProcessException("FlowFile is null")
-        }
-        if (context == null) {
-            throw ProcessException("ProcessContext is null")
-        }
-        if (session == null) {
-            throw ProcessException("ProcessSession is null")
-        }
+    override fun onTrigger(context: ProcessContext, session: ProcessSession) {
+        var flowFile = session.get() ?: return
 
         val outputPath = context.getProperty(OUTPUT_PATH).evaluateAttributeExpressions(flowFile).value
         val inputPath = context.getProperty(INPUT_PATH).evaluateAttributeExpressions(flowFile).value
         val module = context.getProperty(MODULE).evaluateAttributeExpressions(flowFile).value
-        val configPath = context.getProperty(CONFIG_PATH).evaluateAttributeExpressions(flowFile).value
-        val compType = context.getProperty(COMPONENT_TYPE).evaluateAttributeExpressions(flowFile).value
 
         try {
-            val filename: String = flowFile.attributes[NiFiAttributes.FILENAME] ?: throw RoutedException(FAIL_RELATIONSHIP, message = "Filename attribute is missing in flowfile")
+            val filename: String = flowFile.attributes[NiFiAttributes.FILENAME] ?: throw RoutedException(
+                FAIL_RELATIONSHIP,
+                message = "Filename attribute is missing in flowfile"
+            )
             val errorMode = context.getProperty(BEHAVIOUR_ON_ERROR).value
 
             if (module == null || module == "") {
@@ -263,48 +266,69 @@ class Jhove : AbstractRoutedProcessor() {
             val inputFile = Paths.get(inputPath).resolve(filename)
             val outputFile = Paths.get(outputPath).resolve("JHOVE_$filename.xml")
 
-            val res = runJhove(inputFile, outputFile, module, configPath, errorMode)
+            val res = runJhove(inputFile, outputFile, module, configFilePath, errorMode)
 
             if (Files.exists(outputFile)) {
-                var outputFlowFile = session.create(flowFile)
-                outputFlowFile = session.putAttribute(outputFlowFile, NiFiAttributes.FILENAME, outputFile.fileName.toString())
-                if (compType != null) {
-                    outputFlowFile = session.putAttribute(outputFlowFile, NiFiAttributes.COMPONENT_TYPE, compType)
-                }
-
-                try {
-                    FileInputStream(outputFile.toString()).use { fis ->
-                        outputFlowFile = session.importFrom(fis, outputFlowFile)
-                        session.provenanceReporter.create(outputFlowFile, "Produced JHOVE XML output")
-                        session.transfer(outputFlowFile, JHOVE_OUTPUT_RELATIONSHIP)
-                        getLogger().info("Jhove OK for file $filename")
-                        if (res == 0) {
-                            session.transfer(flowFile, SUCCESS_RELATIONSHIP)
-                        } else if (res == 1) {
-                            flowFile = session.putAttribute(
-                                flowFile, "error.message", "Jhove message: well-formed " +
-                                        "but not valid, " + errorMessage
-                            )
-                            session.transfer(flowFile, WELLFORMED_RELATIONSHIP)
-                        } else {
-                            throw RoutedException(FAIL_RELATIONSHIP, false, "Jhove failed on file $inputFile: $errorMessage", null)
-                        }
+                    // Validate JHOVE output against XSD before processing
+                    val jhoveContent = Files.readString(outputFile)
+                    val validationResult = XsdValidator.validateJhove(jhoveContent)
+                    if (!validationResult.isValid) {
+                        throw RoutedException(
+                            FAIL_RELATIONSHIP,
+                            false,
+                            "JHOVE output failed XSD validation: ${validationResult.getErrorMessage()}",
+                            null
+                        )
                     }
-                } catch (ioe: IOException) {
-                    val msg = String.format(
-                        "Could not fetch file %s from file system due to %s; routing to failure",
-                        outputFile, ioe.toString()
+
+                    var outputFlowFile = session.create(flowFile)
+                    outputFlowFile =
+                        session.putAttribute(outputFlowFile, NiFiAttributes.FILENAME, outputFile.fileName.toString())
+                    outputFlowFile = session.putAttribute(outputFlowFile, NiFiAttributes.MIME_TYPE, "application/xml")
+                    outputFlowFile = session.putAttribute(
+                        outputFlowFile,
+                        NiFiAttributes.FILE_SIZE,
+                        Files.size(outputFile).toString()
                     )
-                    throw RoutedException(FAIL_RELATIONSHIP, false, msg, ioe)
+
+                    try {
+                        FileInputStream(outputFile.toString()).use { fis ->
+                            outputFlowFile = session.importFrom(fis, outputFlowFile)
+                            session.provenanceReporter.create(outputFlowFile, "Produced JHOVE XML output")
+                            session.transfer(outputFlowFile, JHOVE_OUTPUT_RELATIONSHIP)
+                            getLogger().info("Jhove OK for file $filename")
+                            if (res == 0) {
+                                session.transfer(flowFile, SUCCESS_RELATIONSHIP)
+                            } else if (res == 1) {
+                                flowFile = session.putAttribute(
+                                    flowFile, "error.message", "Jhove message: well-formed " +
+                                            "but not valid, " + errorMessage
+                                )
+                                session.transfer(flowFile, WELLFORMED_RELATIONSHIP)
+                            } else {
+                                throw RoutedException(
+                                    FAIL_RELATIONSHIP,
+                                    false,
+                                    "Jhove failed on file $inputFile: $errorMessage",
+                                    null
+                                )
+                            }
+                        }
+                    } catch (ioe: IOException) {
+                        val msg = String.format(
+                            "Could not fetch file %s from file system due to %s; routing to failure",
+                            outputFile, ioe.toString()
+                        )
+                        throw RoutedException(FAIL_RELATIONSHIP, false, msg, ioe)
+                    }
+                } else {
+                    throw RoutedException(FAIL_RELATIONSHIP, false, "Output file missing:$outputFile", null)
                 }
-            } else {
-                throw RoutedException(FAIL_RELATIONSHIP, false, "Output file missing:$outputFile", null)
-            }
         } catch (routed: RoutedException) {
             if (routed.penalize == true) {
                 flowFile = session.penalize(flowFile)
             }
-            flowFile!!.attributes["error.message"] = routed.message + ": " + routed.cause.toString()
+            flowFile = session.putAttribute(flowFile, "error.message", routed.message + ": " + routed.cause.toString())
             session.transfer(flowFile, routed.relationship)
         }
     }

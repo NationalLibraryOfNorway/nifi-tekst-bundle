@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jhove xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schema.openpreservation.org/ois/xml/ns/jhove" xsi:schemaLocation="http://schema.openpreservation.org/ois/xml/ns/jhove https://schema.openpreservation.org/ois/xml/xsd/jhove/1.10/jhove.xsd" name="Jhove" release="1.20.1" date="2009-12-23">
+ <date>2025-12-08T16:51:39+00:00</date>
+ <repInfo uri="file:////home/sindreo/projects/nifi/nifi-tekst-bundle/nifi-tekst-bundle-processors/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/access/metadata/other/ocr/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_002.xml">
+  <reportingModule release="1.5.5" date="2024-08-22">XML-hul</reportingModule>
+  <lastModified>2025-12-05T12:55:28+00:00</lastModified>
+  <size>700497</size>
+  <format>XML</format>
+  <version>1.0</version>
+  <status>Well-Formed and valid</status>
+  <sigMatch>
+  <module>XML-hul</module>
+  </sigMatch>
+  <mimeType>text/xml</mimeType>
+  <properties>
+   <property>
+    <name>XMLMetadata</name>
+    <values arity="List" type="Property">
+    <property>
+     <name>Parser</name>
+     <values arity="Scalar" type="String">
+      <value>org.apache.xerces.jaxp.SAXParserImpl$JAXPSAXParser</value>
+     </values>
+    </property>
+    <property>
+     <name>Encoding</name>
+     <values arity="Scalar" type="String">
+      <value>UTF-8</value>
+     </values>
+    </property>
+    <property>
+     <name>Schemas</name>
+     <values arity="List" type="Property">
+     <property>
+      <name>Schema</name>
+      <values arity="Array" type="Property">
+      <property>
+       <name>SchemaLocation</name>
+       <values arity="Scalar" type="String">
+        <value>http://schema.ccs-gmbh.com/metae/alto-1-2.xsd</value>
+       </values>
+      </property>
+      </values>
+     </property>
+     </values>
+    </property>
+    <property>
+     <name>Root</name>
+     <values arity="Scalar" type="String">
+      <value>alto</value>
+     </values>
+    </property>
+    <property>
+     <name>Namespaces</name>
+     <values arity="List" type="Property">
+     <property>
+      <name>Namespace</name>
+      <values arity="Array" type="Property">
+      <property>
+       <name>Prefix</name>
+       <values arity="Scalar" type="String">
+        <value>xsi</value>
+       </values>
+      </property>
+      <property>
+       <name>URI</name>
+       <values arity="Scalar" type="String">
+        <value>http://www.w3.org/2001/XMLSchema-instance</value>
+       </values>
+      </property>
+      </values>
+     </property>
+     <property>
+      <name>Namespace</name>
+      <values arity="Array" type="Property">
+      <property>
+       <name>Prefix</name>
+       <values arity="Scalar" type="String">
+        <value>xlink</value>
+       </values>
+      </property>
+      <property>
+       <name>URI</name>
+       <values arity="Scalar" type="String">
+        <value>http://www.w3.org/1999/xlink</value>
+       </values>
+      </property>
+      </values>
+     </property>
+     </values>
+    </property>
+    </values>
+   </property>
+  </properties>
+  <checksums>
+   <checksum type="CRC32">656e5ced</checksum>
+   <checksum type="MD5">612077a66b69ec80997d3b28d2104824</checksum>
+   <checksum type="SHA-1">f76ca894f675ee2884698db4d39fa3498ad3accc</checksum>
+   <checksum type="SHA-256">0dfc654cd6b53b8164a64011283ef20d3d72cd194c2d35c2d736227995626602</checksum>
+  </checksums>
+ </repInfo>
+</jhove>

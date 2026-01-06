@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jhove xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schema.openpreservation.org/ois/xml/ns/jhove" xsi:schemaLocation="http://schema.openpreservation.org/ois/xml/ns/jhove https://schema.openpreservation.org/ois/xml/xsd/jhove/1.10/jhove.xsd" name="Jhove" release="1.5" date="2009-12-23">
+ <date>2022-09-06T09:07:53+02:00</date>
+ <repInfo uri="/fs02/digitalisert/avis/aviser/romsdalsposten_null_null_18970814_22_96_1/images/romsdalsposten_null_null_18970814_22_96_1-1_002_null.tif">
+  <reportingModule release="1.9.1" date="2019-04-17">TIFF-hul</reportingModule>
+  <lastModified>2022-09-01T13:20:58+02:00</lastModified>
+  <size>184672810</size>
+  <format>TIFF</format>
+  <version>6.0</version>
+  <status>Well-Formed and valid</status>
+  <sigMatch>
+  <module>TIFF-hul</module>
+  </sigMatch>
+  <mimeType>image/tiff</mimeType>
+  <profiles>
+   <profile>Baseline RGB (Class R)</profile>
+   <profile>DLF Benchmark for Faithful Digital Reproductions of Monographs and Serials: color</profile>
+  </profiles>
+  <properties>
+   <property>
+    <name>TIFFMetadata</name>
+    <values arity="Array" type="Property">
+    <property>
+     <name>ByteOrder</name>
+     <values arity="Scalar" type="String">
+      <value>little-endian</value>
+     </values>
+    </property>
+    <property>
+     <name>IFDs</name>
+     <values arity="List" type="Property">
+     <property>
+      <name>Number</name>
+      <values arity="Scalar" type="Integer">
+       <value>1</value>
+      </values>
+     </property>
+     <property>
+      <name>IFD</name>
+      <values arity="Array" type="Property">
+      <property>
+       <name>Offset</name>
+       <values arity="Scalar" type="Long">
+        <value>184603074</value>
+       </values>
+      </property>
+      <property>
+       <name>Type</name>
+       <values arity="Scalar" type="String">
+        <value>TIFF</value>
+       </values>
+      </property>
+      <property>
+       <name>Entries</name>
+       <values arity="List" type="Property">
+       <property>
+        <name>NisoImageMetadata</name>
+        <values arity="Scalar" type="NISOImageMetadata">
+         <value>
+       <mix:mix xmlns:mix="http://www.loc.gov/mix/v10" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/mix/v10 http://www.loc.gov/standards/mix/mix10/mix10.xsd">
+        <mix:BasicDigitalObjectInformation>
+          <mix:byteOrder>little_endian</mix:byteOrder>
+          <mix:Compression>
+           <mix:compressionScheme>1</mix:compressionScheme>
+          </mix:Compression>
+         </mix:BasicDigitalObjectInformation>
+        <mix:BasicImageInformation>
+         <mix:BasicImageCharacteristics>
+          <mix:imageWidth>7151</mix:imageWidth>
+          <mix:imageHeight>8605</mix:imageHeight>
+          <mix:PhotometricInterpretation>
+           <mix:colorSpace>2</mix:colorSpace>
+           <mix:ColorProfile>
+            <mix:IccProfile>
+             <mix:iccProfileName>Adobe RGB (1998)</mix:iccProfileName>
+            </mix:IccProfile>
+           </mix:ColorProfile>
+            <mix:referenceBlackWhite>0 0 255 255 0 0 255 255 0 0 255 255</mix:referenceBlackWhite>
+          </mix:PhotometricInterpretation>
+         </mix:BasicImageCharacteristics>
+        </mix:BasicImageInformation>
+        <mix:ImageCaptureMetadata>
+         <mix:GeneralCaptureInformation>
+         <mix:dateTimeCreated>2022-08-24T08:19:30</mix:dateTimeCreated>
+         <mix:imageProducer></mix:imageProducer>
+         </mix:GeneralCaptureInformation>
+         <mix:ScannerCapture>
+          <mix:ScanningSystemSoftware>
+           <mix:scanningSoftwareName>:PageImprover, 4.5.7975.25809</mix:scanningSoftwareName>
+          </mix:ScanningSystemSoftware>
+         </mix:ScannerCapture>
+         <mix:orientation>1</mix:orientation>
+        </mix:ImageCaptureMetadata>
+        <mix:ImageAssessmentMetadata>
+         <mix:SpatialMetrics>
+          <mix:samplingFrequencyUnit>2</mix:samplingFrequencyUnit>
+          <mix:xSamplingFrequency>
+           <mix:numerator>400</mix:numerator>
+          </mix:xSamplingFrequency>
+          <mix:ySamplingFrequency>
+           <mix:numerator>400</mix:numerator>
+          </mix:ySamplingFrequency>
+         </mix:SpatialMetrics>
+         <mix:ImageColorEncoding>
+          <mix:bitsPerSample>
+           <mix:bitsPerSampleValue>8,8,8</mix:bitsPerSampleValue>
+           <mix:bitsPerSampleUnit>integer</mix:bitsPerSampleUnit>
+          </mix:bitsPerSample>
+          <mix:samplesPerPixel>3</mix:samplesPerPixel>
+         </mix:ImageColorEncoding>
+        </mix:ImageAssessmentMetadata>
+       </mix:mix>
+         </value>
+        </values>
+       </property>
+       <property>
+        <name>DateTime</name>
+        <values arity="Scalar" type="String">
+         <value>2022:08:24 08:19:30</value>
+        </values>
+       </property>
+       <property>
+        <name>NewSubfileType</name>
+        <values arity="Scalar" type="Long">
+         <value>0</value>
+        </values>
+       </property>
+       <property>
+        <name>FillOrder</name>
+        <values arity="Scalar" type="String">
+         <value>high-order</value>
+        </values>
+       </property>
+       <property>
+        <name>SampleFormat</name>
+        <values arity="Array" type="Integer">
+         <value>1</value>
+         <value>1</value>
+         <value>1</value>
+        </values>
+       </property>
+       <property>
+        <name>MinSampleValue</name>
+        <values arity="Array" type="Integer">
+         <value>0</value>
+         <value>0</value>
+         <value>0</value>
+        </values>
+       </property>
+       <property>
+        <name>MaxSampleValue</name>
+        <values arity="Array" type="Integer">
+         <value>255</value>
+         <value>255</value>
+         <value>255</value>
+        </values>
+       </property>
+       <property>
+        <name>TransferRange</name>
+        <values arity="Array" type="Integer">
+         <value>0</value>
+         <value>255</value>
+         <value>0</value>
+         <value>255</value>
+         <value>0</value>
+         <value>255</value>
+        </values>
+       </property>
+       <property>
+        <name>Threshholding</name>
+        <values arity="Scalar" type="Integer">
+         <value>1</value>
+        </values>
+       </property>
+       <property>
+        <name>TIFFITProperties</name>
+        <values arity="List" type="Property">
+        <property>
+         <name>BackgroundColorIndicator</name>
+         <values arity="Scalar" type="String">
+          <value>background not defined</value>
+         </values>
+        </property>
+        <property>
+         <name>ImageColorIndicator</name>
+         <values arity="Scalar" type="String">
+          <value>image not defined</value>
+         </values>
+        </property>
+        <property>
+         <name>TransparencyIndicator</name>
+         <values arity="Scalar" type="String">
+          <value>no transparency</value>
+         </values>
+        </property>
+        <property>
+         <name>PixelIntensityRange</name>
+         <values arity="Array" type="Integer">
+          <value>0</value>
+          <value>255</value>
+         </values>
+        </property>
+        <property>
+         <name>RasterPadding</name>
+         <values arity="Scalar" type="String">
+          <value>1 byte</value>
+         </values>
+        </property>
+        <property>
+         <name>BitsPerRunLength</name>
+         <values arity="Scalar" type="Integer">
+          <value>8</value>
+         </values>
+        </property>
+        <property>
+         <name>BitsPerExtendedRunLength</name>
+         <values arity="Scalar" type="Integer">
+          <value>16</value>
+         </values>
+        </property>
+        </values>
+       </property>
+       <property>
+        <name>TIFFEPProperties</name>
+        <values arity="List" type="Property">
+        <property>
+         <name>ICCProfile</name>
+         <values arity="Scalar" type="Boolean">
+          <value>true</value>
+         </values>
+        </property>
+        </values>
+       </property>
+       </values>
+      </property>
+      </values>
+     </property>
+     </values>
+    </property>
+    </values>
+   </property>
+  </properties>
+  <checksums>
+   <checksum type="CRC32">56fe0aa0</checksum>
+   <checksum type="MD5">88435deeefb5b3a80c2ef45037318372</checksum>
+   <checksum type="SHA-1">800851778d1ff05f942aaff943febcf4ec61de7d</checksum>
+  </checksums>
+ </repInfo>
+</jhove>
