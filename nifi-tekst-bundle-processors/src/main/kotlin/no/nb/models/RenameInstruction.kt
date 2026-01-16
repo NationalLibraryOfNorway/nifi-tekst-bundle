@@ -1,8 +1,6 @@
 package no.nb.models
 
-import java.io.File
-
-public data class Entry(
+public data class Renames(
     val originalName: String,
     val newName: String
 )
