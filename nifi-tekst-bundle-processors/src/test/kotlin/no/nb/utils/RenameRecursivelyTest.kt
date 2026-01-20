@@ -2,23 +2,24 @@ package no.nb.utils
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import no.nb.models.Entry
+import no.nb.models.RenameInstruction
+import no.nb.utils.RenameUtils.renameAll
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.io.path.createTempDirectory
 
 object RenameAllManualTest {
+
     private val mapper = ObjectMapper()
 
-    //Json file reader
     private fun readFile(fileName: String): JsonNode {
-        val resource = this::class.java.classLoader.getResource("reorder-files/$fileName.json")
-        requireNotNull(resource) { "Resource not found" }
-        val jsonContent = File(resource.toURI()).readText()
-        return mapper.readTree(jsonContent)
+        val resource = this::class.java.classLoader
+            .getResource("reorder-files/$fileName")
+            ?: error("Resource not found: reorder-files/$fileName")
+
+        return mapper.readTree(File(resource.toURI()))
     }
 
     /**
@@ -29,12 +30,12 @@ object RenameAllManualTest {
         val tempDir = createTempDirectory("rename-test-").toFile()
         val targetRoot = File(tempDir, "tmp").apply { mkdirs() }
 
-        // Find the reorder-files resource directory
         val reorderFilesUrl = requireNotNull(
             RenameAllManualTest::class.java.classLoader.getResource("reorder-files")
         ) { "reorder-files not found on classpath" }
 
         val resourceRoot = File(reorderFilesUrl.toURI())
+
         resourceRoot.walkTopDown().forEach { source ->
             val relative = source.relativeTo(resourceRoot)
             val target = File(targetRoot, relative.path)
@@ -48,129 +49,99 @@ object RenameAllManualTest {
         return targetRoot
     }
 
-    private val flowFile = readFile("flowfile")
-    private val itemId = flowFile["change"][0]["itemId"].asText()
-
-    private val addEntries = readFile("addEntries")
-    private val firstEntry = addEntries["firstEntry"]
-
-    private fun getDataDir(baseDir: File, itemId: String): Pair<File, File> {
+    private fun getDataDirs(baseDir: File, itemId: String): Pair<File, File> {
         val access = File(baseDir, "$itemId/representations/access/data")
         val primary = File(baseDir, "$itemId/representations/primary/data")
-        return Pair(access, primary)
+        return access to primary
     }
 
     @Test
-    fun `renameAll`() {
+    fun `renameAll using renameInstructions`() {
         val tempRoot = copyResourceDirToTemp()
-        val entries = firstEntry.map { node ->
-            Entry(
-                originalName = node["originalName"].asText(), newName = node["newName"].asText()
+        val jsonFile = readFile("renameInstructions.json")
+
+        val renameInstructions =
+            jsonFile["renameInstructions"].map { node ->
+                RenameInstruction(
+                    originalName = node["originalName"].asText(),
+                    newName = node["newName"].asText()
+                )
+            }
+
+        // Pre-check
+        renameInstructions.forEach { instruction ->
+            val itemId = instruction.originalName.substringBefore('_')
+            val (accessDir, primaryDir) = getDataDirs(tempRoot, itemId)
+
+            assertTrue(File(accessDir, instruction.originalName).exists())
+            assertTrue(File(primaryDir, instruction.originalName).exists())
+        }
+
+        renameAll(tempRoot.toPath(), renameInstructions)
+
+        val expectedByItem = renameInstructions
+            .groupBy { it.newName.substringBefore('_') }
+            .mapValues { (_, instructions) -> instructions.map { it.newName }.toSet() }
+
+        expectedByItem.forEach { (itemId, expectedNames) ->
+            val (accessDir, primaryDir) = getDataDirs(tempRoot, itemId)
+
+            assertEquals(expectedNames, accessDir.listFiles()?.map { it.name }?.toSet().orEmpty())
+            assertEquals(expectedNames, primaryDir.listFiles()?.map { it.name }?.toSet().orEmpty())
+        }
+    }
+
+    @Test
+    fun `renameAll does nothing when originalName equals newName`() {
+        val tempRoot = copyResourceDirToTemp()
+        val jsonFile = readFile("renameInstructions.json")
+
+        // Get similar instructions
+        val renameInstructions = jsonFile["renameInstructions"]
+            .filter { node -> node["originalName"].asText() == node["newName"].asText() }
+            .map { node ->
+                RenameInstruction(
+                    originalName = node["originalName"].asText(),
+                    newName = node["newName"].asText()
+                )
+            }
+
+        // Capture pre-state
+        val preState = tempRoot.walkTopDown()
+            .filter { it.isFile }
+            .map { it.relativeTo(tempRoot).path }
+            .toSet()
+
+        renameAll(tempRoot.toPath(), renameInstructions)
+
+        // Capture post-state
+        val postState = tempRoot.walkTopDown()
+            .filter { it.isFile }
+            .map { it.relativeTo(tempRoot).path }
+            .toSet()
+
+        assertEquals(preState, postState, "No files should be moved or renamed")
+    }
+
+    @Test
+    fun `renameAll cleans up temporary directory`() {
+        val tempRoot = copyResourceDirToTemp()
+        val jsonFile = readFile("renameInstructions.json")
+
+        val renameInstructions = jsonFile["renameInstructions"].map { node ->
+            RenameInstruction(
+                originalName = node["originalName"].asText(),
+                newName = node["newName"].asText()
             )
         }
 
-        // Pre-check: files exist and contain expected originalName
-        for (entry in entries) {
-            val originalId = entry.originalName.substringBefore('_')
-            val (accessDir, primaryDataDir) = getDataDir(tempRoot, originalId)
-            val accessFile = File(accessDir, entry.originalName)
-            val primaryFile = File(primaryDataDir, entry.originalName)
+        renameAll(tempRoot.toPath(), renameInstructions)
 
-            assertTrue(accessFile.exists(), "Access file ${entry.originalName} should exist before renaming")
-            assertTrue(primaryFile.exists(), "Primary file ${entry.originalName} should exist before renaming")
+        // Assert no temp_conflicts_ directory remains
+        val tempDirs = tempRoot.listFiles { file ->
+            file.isDirectory && file.name.startsWith("temp_conflicts_")
         }
-
-        renameAll(
-            entries = entries, baseDir = tempRoot
-        )
-
-        // Check that files have been renamed correctly
-        for (entry in entries) {
-            val (accessDir, primaryDataDir) = getDataDir(tempRoot, itemId)
-            accessDir.listFiles { f -> f.extension == "jp2" && f.name == entry.newName }?.forEach { file ->
-                assertEquals(entry.newName, file.name.trim())
-            }
-            primaryDataDir.listFiles { f -> f.extension == "jp2" && f.name == entry.newName }?.forEach { file ->
-                assertEquals(entry.newName, file.name.trim())
-            }
-        }
-
-        // Cleanup
-        tempRoot.deleteRecursively()
+        assertTrue(tempDirs.isNullOrEmpty(), "Temporary directory should be cleaned up")
     }
 
-    @Test
-    fun `renameRecursively renames both access and primary files`() {
-        val tempDir = createTempDir()
-        val originalName = "${itemId}_00002.jpg"
-        val newName = "${itemId}_00001.jpg"
-        val entries = listOf(Entry(originalName, newName))
-        val visited = mutableSetOf<Int>()
-
-        // Create access and primary directories and files
-        val (accessDir, primaryDir) = getDataDir(tempDir, itemId)
-        accessDir.mkdirs()
-        primaryDir.mkdirs()
-        val accessFile = File(accessDir, originalName).apply { writeText("access content") }
-        val primaryFile = File(primaryDir, originalName).apply { writeText("primary content") }
-        val accessTarget = File(accessDir, newName)
-        val primaryTarget = File(primaryDir, newName)
-
-        // Pre-check: files exist and the target does not
-        assertTrue(accessFile.exists())
-        assertTrue(primaryFile.exists())
-        assertFalse(accessTarget.exists())
-        assertFalse(primaryTarget.exists())
-
-        // Act: call renameRecursively directly
-        renameRecursively(
-            index = 0,
-            entries = entries,
-            baseDir = tempDir,
-            visited = visited,
-            tempDir = tempDir
-        )
-
-        // Post-check: files have been renamed and the file has the expected content
-        assertFalse(accessFile.exists())
-        assertFalse(primaryFile.exists())
-        assertTrue(accessTarget.exists())
-        assertTrue(primaryTarget.exists())
-        assertEquals("access content", accessTarget.readText())
-        assertEquals("primary content", primaryTarget.readText())
-
-        tempDir.deleteRecursively()
-    }
-
-    @Test
-    fun `getAccessAndPrimary returns correct files or nulls`() {
-        val tempDir = createTempDir()
-        val fileName = "${itemId}_00001.jpg"
-
-        // Create access and primary directories
-        val (accessDir, primaryDir) = getDataDir(tempDir, itemId)
-        accessDir.mkdirs()
-        primaryDir.mkdirs()
-
-        // Create only the access file
-        val accessFile = File(accessDir, fileName)
-        accessFile.writeText("access content")
-
-        // Do NOT create the primary file to test null case
-        val result = getAccessAndPrimary(tempDir, fileName, tempDir)
-
-        assertEquals(accessFile, result.access)
-        assertEquals(null, result.primary)
-
-        // Now create the primary file and test again
-        val primaryFile = File(primaryDir, fileName)
-        primaryFile.writeText("primary content")
-
-        val result2 = getAccessAndPrimary(tempDir, fileName, tempDir)
-        assertEquals(accessFile, result2.access)
-        assertEquals(primaryFile, result2.primary)
-
-        // Clean up
-        tempDir.deleteRecursively()
-    }
 }

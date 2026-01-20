@@ -2,8 +2,9 @@ package no.nb.nifi.tekst.processors
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import no.nb.models.Entry
-import no.nb.utils.renameAll
+import no.nb.models.RenameInstruction
+import no.nb.utils.RenameUtils.renameAll
+import no.nb.utils.UUIDv7.randomUUID
 import org.apache.nifi.annotation.behavior.DynamicProperty
 import org.apache.nifi.annotation.behavior.SideEffectFree
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
@@ -92,21 +93,21 @@ class ReorderFiles : AbstractProcessor() {
     *   {originalName: ID1_01.jpg, newName: ID1_01.jpt},
     *   {originalName: ID2_04.jpg, newName: ID1:02.jpg}]
     */
-   fun addEntries(itemId: String, newOrder: JsonNode?, zeroPadding: String): List<Entry> {
-       val entries = mutableListOf<Entry>()
-       newOrder?.forEachIndexed { index, imageName ->
+   fun addInstruction(itemId: String, orderedImages: JsonNode?, zeroPadding: String): List<RenameInstruction> {
+       val listOfInstructions = mutableListOf<RenameInstruction>()
+       orderedImages?.forEachIndexed { index, imageName ->
            var originalName = imageName.asText()
            if (!originalName.endsWith(".jp2", ignoreCase = true)) {
                originalName += ".jp2"
            }
            val pageNumber = String.format(zeroPadding, index + 1)
            val newName = "${itemId}_$pageNumber.jp2"
-           entries.add(Entry(originalName, newName))
+           listOfInstructions.add(RenameInstruction(originalName, newName))
        }
-       return entries
+       return listOfInstructions
    }
 
-    fun deleteOcr(itemId: String, baseDir: File) {
+    fun deleteOcrFiles(itemId: String, baseDir: File) {
         val ocrDir = File(baseDir,"/$itemId/access/metadata/other/ocr")
         if (ocrDir.exists() && ocrDir.isDirectory) {
             ocrDir.listFiles()?.forEach { file ->
@@ -134,25 +135,56 @@ class ReorderFiles : AbstractProcessor() {
             flowFile = session.putAttribute(flowFile, "mime.type", "application/json")
 
             // Read the content of the flowfile as JSON
-            var jsonStr = ""
+            var flowFileJson = ""
             session.read(flowFile) { input ->
-                jsonStr = input.bufferedReader(StandardCharsets.UTF_8).readText()
+                flowFileJson = input.bufferedReader(StandardCharsets.UTF_8).readText()
             }
 
             val mapper = ObjectMapper()
-            val rootNode: JsonNode = mapper.readTree(jsonStr)
+            val rootNode: JsonNode = mapper.readTree(flowFileJson)
 
             val batchId = rootNode.get("batchId")?.asText()
             val changes = rootNode.get("change")
+            val renameInstructions = mutableListOf<RenameInstruction>()
+            val newOrder = mutableListOf<String>()
+
+            val changeList = mutableListOf<Map<String, Any>>()
+
             if (changes != null && changes.isArray) {
                 for (change in changes) {
-                    val itemId: String = change.get("itemId").asText() ?: ""
-                    val newOrder = change.get("newOrder")
-                    val entries: List<Entry> = addEntries(itemId, newOrder, zeroPadding)
-                    logger.info("Reordering files for ItemId=$itemId")
-                    renameAll(entries, baseDirFile)
-                    logger.info("Finished reordering files for ItemId=$itemId")
-                    deleteOcr(itemId, baseDirFile)
+                    var itemId: String = change.get("itemId").asText() ?: ""
+
+                    //In case a new object without an itemId
+                    if(itemId.isBlank() || itemId == "null") {
+                        itemId = randomUUID().toString()
+                    }
+
+                    val orderedImages = change.get("newOrder")
+
+                    val itemInstruction = addInstruction(itemId, orderedImages, zeroPadding)
+                    renameInstructions += itemInstruction
+                    val itemNewOrder = itemInstruction.map { it.newName }
+                    newOrder += itemNewOrder
+
+                    // Collect per-item change
+                    changeList.add(mapOf("itemId" to itemId, "newOrder" to itemNewOrder))
+
+                    deleteOcrFiles(itemId, baseDirFile)
+                }
+
+                logger.info("Reordering files for batchId=$batchId")
+                renameAll(baseDirFile.toPath(), renameInstructions)
+                logger.info("Finished reordering files for batchId=$batchId")
+
+                val outputJson = mapper.writeValueAsString(
+                    mapOf(
+                        "batchId" to batchId,
+                        "change" to changeList
+                    )
+                )
+
+                flowFile = session.write(flowFile) { out ->
+                    out.write(outputJson.toByteArray(StandardCharsets.UTF_8))
                 }
             }
             session.transfer(flowFile, REL_SUCCESS)
@@ -162,5 +194,4 @@ class ReorderFiles : AbstractProcessor() {
             session.transfer(flowFile, REL_FAILURE)
         }
     }
-
 }

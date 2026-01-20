@@ -1,6 +1,6 @@
 package no.nb.models
 
-public data class Renames(
+data class RenameInstruction(
     val originalName: String,
     val newName: String
 )

@@ -15,8 +15,12 @@
             "itemId": "019a3aa3-d0af-7658-9a44-5dfe09e6ec1c",
             "newOrder": [
               "019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00001",
-              "019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00003",
               "019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00002"
+            ]
+          },
+          {
+            "newOrder": [
+              "019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00003"
             ]
           }
         ]

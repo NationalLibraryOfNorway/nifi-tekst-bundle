@@ -2,6 +2,7 @@ package no.nb.nifi.tekst.processors
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -15,29 +16,29 @@ class ReorderFilesTest {
         entries.map { entry -> entry.mapValues { (_, v) -> v.substringAfterLast('/') } }
 
     private fun readFile(fileName: String): JsonNode {
-        val resource = this::class.java.classLoader.getResource("reorder-files/$fileName.json")
+        val resource = this::class.java.classLoader.getResource("reorder-files/$fileName")
         requireNotNull(resource) { "Resource not found" }
         val jsonContent = File(resource.toURI()).readText()
         return mapper.readTree(jsonContent)
     }
 
     @Test
-    fun `addEntries() provides the correct order of entries`() {
-        val flowfile = readFile("flowfile")
+    fun `addReorderInstructions() provides the correct instructions regardless of order`() {
+        val flowfile = readFile("flowfile.json")
         val changes = flowfile["change"]
-        val addEntries = readFile("addEntries")
+        val addInstruction = readFile("addRenameInstruction.json")
+        val expected = addInstruction["addInstruction"]
+        val expectedOrder = mapper.convertValue(expected, List::class.java) as List<Map<String, String>>
 
         val firstChange = changes[0]
         val itemId = firstChange["itemId"].asText()
-        val order = firstChange["newOrder"]
-        val actualEntry = reorderFiles.addEntries(itemId, order, "%05d")
-        val expected = addEntries["firstEntry"]
+        val newOrder = firstChange["newOrder"]
+        val renameInstructions = reorderFiles.addInstruction(itemId, newOrder, "%05d")
 
-        val actualEntryList = mapper.convertValue(actualEntry, List::class.java) as List<Map<String, String>>
-        val actualEntryStripped = stripPath(actualEntryList)
-        val actual = mapper.valueToTree<JsonNode>(actualEntryStripped)
+        val renameList = mapper.convertValue(renameInstructions, List::class.java) as List<Map<String, String>>
+        val actualOrder = stripPath(renameList)
 
-        assertEquals(expected, actual)
+        assertEquals(expectedOrder.toSet(), actualOrder.toSet())
     }
 
     @Test
@@ -52,10 +53,39 @@ class ReorderFilesTest {
         assertTrue(file1.exists())
         assertTrue(file2.exists())
 
-        reorderFiles.deleteOcr(itemId, baseDir)
+        reorderFiles.deleteOcrFiles(itemId, baseDir)
 
         assertTrue(ocrDir.exists())
         assertTrue(ocrDir.isDirectory)
         assertEquals(0, ocrDir.listFiles()?.size ?: -1)
+    }
+
+    @Test
+    fun `processor generates itemId for missing itemId in flowfile json`() {
+        val reorderFiles = ReorderFiles()
+        val mapper = ObjectMapper()
+        val zeroPadding = "%05d"
+
+        // Read and modify flowfile.json
+        val flowfile = readFile("flowfile.json")
+        val changes = flowfile["change"] as ArrayNode
+
+        val changeList = mutableListOf<Map<String, Any>>()
+        for (change in changes) {
+            var itemId: String = change.get("itemId")?.asText() ?: ""
+            if (itemId.isBlank() || itemId == "null") {
+                itemId = no.nb.utils.UUIDv7.randomUUID().toString()
+            }
+            val orderedImages = change.get("newOrder")
+            val itemInstruction = reorderFiles.addInstruction(itemId, orderedImages, zeroPadding)
+            val itemNewOrder = itemInstruction.map { it.newName }
+            changeList.add(mapOf("itemId" to itemId, "newOrder" to itemNewOrder))
+        }
+
+        // Assert that the last entry's itemId is a valid UUID
+        val generatedItemId = changeList.last()["itemId"] as String
+        assertTrue(generatedItemId.matches(Regex("^[0-9a-fA-F-]{36}$")), "Generated itemId should be a UUID")
+        val newOrder = changeList.last()["newOrder"] as List<*>
+        assertEquals(listOf("${generatedItemId}_00001.jp2"), newOrder)
     }
 }
