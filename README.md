@@ -38,11 +38,11 @@ Denne flowen skal vi bruke for lokal utvikling, og du kan bruke volume mountene 
 1. Hamburger meny -> Controller Settings -> Registry Clients (fane) -> Add new registry client (+ knapp)
 2. Velg "GitHubFlowRegistryClient" som type, og "add".
 3. Trykk på kebab-menyen til høyre for den nye registry clienten, og velg "Edit".
-4. Velg fane "Properties", og legg inn registry verdier
+4. Velg fane "Properties", og legg inn registry verdier.
    1. "Authentication Type": "App Installation"
-      1. Autentiseringshemmeligheter for Github "appen" ligger i Vault (`github_internal_bot`).
+      1. Autentiseringshemmeligheter for Github "appen" ligger i Vault `github_internal_bot`.
    2. "Github API URL", "Repository Owner" og "Repository Name" er verdier til den **interne** github instansen vår med ett github repo som registry. (se properties i stage/prod for eksempel)
-5. Gå tilbake til hoved "canvas"
+5. Gå tilbake til hoved "canvas".
 6. Dra ut **skyen** med **pil ned** ikonet i øvre venstre hjørne, og slipp den på canvaset.
 7. Velg **"nifi-tekst-bundle-dev"** i **flow** dropdownen, og trykk "Import".
 
