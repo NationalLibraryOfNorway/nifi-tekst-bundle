@@ -38,7 +38,8 @@ class JhoveToMetsBrowsingIntegrationTest {
 
     // Configuration
     private val jhoveConfigPath = "$projectFolder/src/main/resources/jhoveconf.xml"
-    private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
+    // Object ID is derived from the folder name
+    private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_no_jhove"
 
     @BeforeEach
     fun setup() {
@@ -118,7 +119,7 @@ class JhoveToMetsBrowsingIntegrationTest {
         // Step 2: Run CreateMetsBrowsing processor using generated JHOVE data
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
         metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
         metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
         metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
@@ -252,7 +253,7 @@ class JhoveToMetsBrowsingIntegrationTest {
         // Step 2: Run CreateMetsBrowsing - should FAIL with clear error message
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
         metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
         metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
         metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
@@ -301,7 +302,7 @@ class JhoveToMetsBrowsingIntegrationTest {
 
         // Run CreateMetsBrowsing processor
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
         metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
         metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
         metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)

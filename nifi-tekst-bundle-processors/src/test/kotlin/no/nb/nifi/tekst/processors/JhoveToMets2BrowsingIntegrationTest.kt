@@ -39,8 +39,8 @@ class JhoveToMets2BrowsingIntegrationTest {
     // Expected output - METS2 version
     private val expectedMets2File = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml")
 
-    // Configuration
-    private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
+    // Configuration - Object ID is derived from the folder name
+    private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_no_jhove"
 
     @BeforeEach
     fun setup() {
@@ -128,7 +128,7 @@ class JhoveToMets2BrowsingIntegrationTest {
         // Step 2: Run CreateMetsBrowsing processor using generated JHOVE data with METS2 and MIX2
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
         metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
         metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
         metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
@@ -297,7 +297,7 @@ class JhoveToMets2BrowsingIntegrationTest {
         // Step 2: Run CreateMetsBrowsing with METS2 - should FAIL with clear error message
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
         metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
         metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
         metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
@@ -345,7 +345,7 @@ class JhoveToMets2BrowsingIntegrationTest {
         val mets1OutputFile = File.createTempFile("mets1_comparison", ".xml")
         try {
             val mets1Runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-            mets1Runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+            mets1Runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
             mets1Runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
             mets1Runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
             mets1Runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
@@ -360,7 +360,7 @@ class JhoveToMets2BrowsingIntegrationTest {
 
             // Step 3: Generate METS2 with MIX2
             val mets2Runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-            mets2Runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+            mets2Runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
             mets2Runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
             mets2Runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
             mets2Runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
@@ -484,7 +484,7 @@ class JhoveToMets2BrowsingIntegrationTest {
 
         // Run CreateMetsBrowsing processor with METS2 + MIX2
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
         metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
         metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
         metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)

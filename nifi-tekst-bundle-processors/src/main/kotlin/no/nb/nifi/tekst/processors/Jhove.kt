@@ -25,8 +25,9 @@ import javax.xml.xpath.XPathFactory
 
 @Tags("NB", "Validation", "JHOVE")
 @CapabilityDescription(
-    ("Validates a file with JHOVE. " +
-            "Note that to force XML output complient with MIX10, and hence compatible with CreateMetsBrowsing, " +
+    ("Validates a file with JHOVE and writes the JHOVE XML output to disk. " +
+            "The output file is written to the configured 'Output folder path' with the naming pattern 'JHOVE_<filename>.xml'. " +
+            "Note that to force XML output compliant with MIX10, and hence compatible with CreateMetsBrowsing, " +
             "we've added <mixVersion>1.0</mixVersion> to jhoveconf.xml")
 )
 @ReadsAttributes(ReadsAttribute(attribute = NiFiAttributes.FILENAME, description = ""))
@@ -89,7 +90,7 @@ class Jhove : AbstractProcessor() {
 
         val OUTPUT_PATH: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("Output folder path")
-            .description("Path to folder for output file.")
+            .description("Path to folder where JHOVE XML output files will be written to disk (e.g., /data/jhove-output). Files are named 'JHOVE_<filename>.xml'.")
             .required(true)
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
@@ -141,7 +142,7 @@ class Jhove : AbstractProcessor() {
 
         val JHOVE_OUTPUT_RELATIONSHIP: Relationship = Relationship.Builder()
             .name("jhove xml output")
-            .description("Output file from JHOVE validation")
+            .description("FlowFile containing the JHOVE XML output (also written to disk at the configured output path)")
             .build()
     }
 
