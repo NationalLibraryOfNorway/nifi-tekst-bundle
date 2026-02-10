@@ -3,6 +3,9 @@ run-name: >
   ${{ github.actor }} ${{ startsWith(github.ref, 'refs/tags/') && 'is releasing a package' || 'is verifying the project' }}
 
 on:
+  pull_request:
+    branches:
+      - '*'
   push:
     branches:
       - '*'
