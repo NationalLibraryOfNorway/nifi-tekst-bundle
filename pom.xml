@@ -63,6 +63,39 @@
                 <artifactId>nexus-staging-maven-plugin</artifactId>
                 <extensions>false</extensions>
             </plugin>
+            <!-- Allow the packages in no.nb.nifi group to use snapshot too, not only the org.apache.nifi -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-maven-version</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireReleaseDeps>
+                                    <message>Other than org apache nifi and nb components themselves no snapshot dependencies are allowed</message>
+                                    <failWhenParentIsSnapshot>true</failWhenParentIsSnapshot>
+                                    <excludes>
+                                        <exclude>no.nb.nifi:*</exclude>
+                                        <exclude>org.apache.nifi:*</exclude>
+                                        <exclude>org.apache.nifi.minifi:*</exclude>
+                                        <exclude>org.apache.nifi.registry:*</exclude>
+                                        <exclude>org.roda-project:*</exclude>
+                                    </excludes>
+                                </requireReleaseDeps>
+                                <bannedDependencies>
+                                    <!-- Used to avoid problems with org.apache.logging.log4j:log4j-core:jar:2.18.0 in droid-core-interfaces -->
+                                    <searchTransitive>false</searchTransitive>
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
