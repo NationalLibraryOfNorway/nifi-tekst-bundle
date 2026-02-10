@@ -12,7 +12,7 @@ on:
 
 jobs:
   build_maven_pipeline:
-    uses: NationalLibraryOfNorway/tekst-workflows/.github/workflows/maven-verify-and-upload-artifact.yml@feat/artifactory-support
+    uses: NationalLibraryOfNorway/tekst-workflows/.github/workflows/maven-verify-and-upload-artifact.yml@main
     with:
       JDK_VERSION: 21
       MAVEN_VERSION: 3.9
