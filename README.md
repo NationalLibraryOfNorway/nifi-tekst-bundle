@@ -8,6 +8,8 @@ Bundle av prosessorer laget for produksjonsløyper for tekstmateriale.
 
 * Docker og Docker Compose
 * JDK 21 og Maven (for å bygge NAR-pakken)
+* [Git LFS](https://git-lfs.com/) (for å laste ned testfiler med store størrelser).
+  * [Installeringsinstruksjoner](https://github.com/git-lfs/git-lfs?tab=readme-ov-file#installing)
 
 ### Bygg og start
 
@@ -28,10 +30,21 @@ NiFi vil være tilgjengelig på https://localhost:8443/nifi/
 
 ### GitHub Registry for flow-konfigurasjon
 
-Bruk flowen 'nifi-tekst-bundle-dev' for å utvikle og teste prosessorene lokalt.
-NiFi-flowen hentes fra et GitHub Registry. Autentiseringshemmeligheter for Github "appen" ligger i Vault (`github_internal_bot`).
-1. Burger meny -> Controller Settings -> Registry Clients (fane) -> Add new registry client (+ knapp)
-2. Velg "GitHubFlowRegistryClient" som type, og fyll inn informasjonen. Se stage/prod for eksempel på hvordan dette er satt opp.
+Bruk flowen **nifi-tekst-bundle-dev** for å utvikle og teste prosessorene lokalt.
+
+Denne flowen skal vi bruke for lokal utvikling, og du kan bruke volume mountene (se under) for å teste med filer og output lokalt.
+
+#### NiFi-flowen hentes fra et GitHub Registry. 
+1. Hamburger meny -> Controller Settings -> Registry Clients (fane) -> Add new registry client (+ knapp)
+2. Velg "GitHubFlowRegistryClient" som type, og "add".
+3. Trykk på kebab-menyen til høyre for den nye registry clienten, og velg "Edit".
+4. Velg fane "Properties", og legg inn registry verdier
+   1. "Authentication Type": "App Installation"
+      1. Autentiseringshemmeligheter for Github "appen" ligger i Vault (`github_internal_bot`).
+   2. "Github API URL", "Repository Owner" og "Repository Name" er verdier til den **interne** github instansen vår med ett github repo som registry. (se properties i stage/prod for eksempel)
+5. Gå tilbake til hoved "canvas"
+6. Dra ut **skyen** med **pil ned** ikonet i øvre venstre hjørne, og slipp den på canvaset.
+7. Velg **"nifi-tekst-bundle-dev"** i **flow** dropdownen, og trykk "Import".
 
 ### Volume mounts
 
@@ -52,8 +65,9 @@ docker compose restart nifi
 
 ## Utrulling
 
-Pr. nå er det ingen faste metoder for å rulle ut nye NARs.
-NAR-pakkene kan enkelt kopieres til din NiFi-server etter å ha blitt bygget lokalt.
+Utrulling skjer via opplastning til Artifactory, og deretter nedlastning fra NiFi i stage/prod miljøene.
+
+Bruk NiFi flowen "Update NAR Packages"
 
 ## Vedlikehold
 
