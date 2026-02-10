@@ -17,3 +17,10 @@ METS.xml
 
 ### Other ###
 .sdkmanrc
+
+### NiFi Docker ###
+nifi-docker/output/*
+!nifi-docker/output/README.md
+nifi-docker/conf/*
+!nifi-docker/conf/flow.json.gz
+!nifi-docker/conf/nifi.properties

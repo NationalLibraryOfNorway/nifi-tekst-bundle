@@ -19,10 +19,10 @@ class CreateMetsBrowsingTest {
     private lateinit var outputFile: File
     private val projectFolder = Paths.get("").toAbsolutePath().toString()
     private val expectedFile = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS_BROWSING.xml")
-    private val tekstFolder = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
-    private val altoFolder = "$tekstFolder/access/metadata/other/ocr"
-    private val imageFolder = "$tekstFolder/access/data"
-    private val jhoveFolder = "$tekstFolder/access/metadata/technical/jhove"
+    private val objectFolder = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
+    private val altoFolderRelative = "access/metadata/other/ocr"
+    private val imageFolderRelative = "access/data"
+    private val jhoveFolderRelative = "access/metadata/technical/jhove"
     private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
 
     @BeforeEach
@@ -41,10 +41,10 @@ class CreateMetsBrowsingTest {
     fun testSuccessfulMetsBrowsingGeneration() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -62,10 +62,10 @@ class CreateMetsBrowsingTest {
     fun testGeneratedMetsStructure() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -121,10 +121,10 @@ class CreateMetsBrowsingTest {
     fun testGeneratedMetsChecksums() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -148,10 +148,10 @@ class CreateMetsBrowsingTest {
     fun testGeneratedMetsFileSize() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -172,10 +172,10 @@ class CreateMetsBrowsingTest {
     fun testMissingAltoFolder() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "/nonexistent/folder")
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "nonexistent/folder")
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -191,10 +191,10 @@ class CreateMetsBrowsingTest {
     fun testMissingImageFolder() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "/nonexistent/folder")
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "nonexistent/folder")
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -208,15 +208,23 @@ class CreateMetsBrowsingTest {
 
     @Test
     fun testEmptyAltoFolder() {
-        val emptyFolder = Files.createTempDirectory("empty_alto").toFile()
+        // Create a temp object folder with an empty alto subdirectory
+        val tempObjectFolder = Files.createTempDirectory("test_object").toFile()
+        val emptyAltoFolder = File(tempObjectFolder, "empty_alto")
+        emptyAltoFolder.mkdirs()
+        // Also need image and jhove folders for the test to reach the alto check
+        val imageDir = File(tempObjectFolder, imageFolderRelative)
+        val jhoveDir = File(tempObjectFolder, jhoveFolderRelative)
+        imageDir.mkdirs()
+        jhoveDir.mkdirs()
 
         try {
             val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-            runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-            runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, emptyFolder.absolutePath)
-            runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-            runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+            runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, tempObjectFolder.absolutePath)
+            runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "empty_alto")
+            runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+            runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
             runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
             runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
             runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -227,7 +235,7 @@ class CreateMetsBrowsingTest {
 
             runner.assertAllFlowFilesTransferred(CreateMetsBrowsing.REL_FAILURE)
         } finally {
-            emptyFolder.delete()
+            tempObjectFolder.deleteRecursively()
         }
     }
 
@@ -235,10 +243,10 @@ class CreateMetsBrowsingTest {
     fun testGeneratedMetsUrns() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -259,10 +267,10 @@ class CreateMetsBrowsingTest {
     fun testMatchesExpectedOutput() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -323,10 +331,10 @@ class CreateMetsBrowsingTest {
 
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72")
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, debugOutput.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -347,10 +355,10 @@ class CreateMetsBrowsingTest {
     fun testTekstPrettyPrintComparison() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -427,10 +435,10 @@ class CreateMetsBrowsingTest {
     fun testSuccessfulMets2BrowsingGeneration() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -448,10 +456,10 @@ class CreateMetsBrowsingTest {
     fun testMets2NamespacesAndSchema() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -478,10 +486,10 @@ class CreateMetsBrowsingTest {
     fun testMets2MixStructure() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -512,10 +520,10 @@ class CreateMetsBrowsingTest {
     fun testMets2Mix2ImageDimensions() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -540,10 +548,10 @@ class CreateMetsBrowsingTest {
     fun testMets2Mix2SamplingFrequency() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -573,10 +581,10 @@ class CreateMetsBrowsingTest {
     fun testMets2Jpeg2000EncodingOptions() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -605,10 +613,10 @@ class CreateMetsBrowsingTest {
     fun testMets2FileSecAndStructMap() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -640,10 +648,10 @@ class CreateMetsBrowsingTest {
     fun testMets2ChecksumsAndFileSizes() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -673,10 +681,10 @@ class CreateMetsBrowsingTest {
     fun testMets2MatchesExpectedOutput() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -725,10 +733,10 @@ class CreateMetsBrowsingTest {
     fun testMets2PrettyPrintComparison() {
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -788,10 +796,10 @@ class CreateMetsBrowsingTest {
 
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, debugOutput.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -812,10 +820,10 @@ class CreateMetsBrowsingTest {
         // Test that the default versions (when not explicitly set) produce valid METS2 + MIX2 output
         val runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        runner.setProperty(CreateMetsBrowsing.OBJECT_ID, objectId)
-        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolder)
-        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolder)
-        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolder)
+        runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder)
+        runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, imageFolderRelative)
+        runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, jhoveFolderRelative)
         runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, outputFile.absolutePath)
         runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         // Not setting METS_VERSION and MIX_VERSION - should default to METS_2 and MIX_2_0

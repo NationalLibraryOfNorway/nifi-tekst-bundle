@@ -42,10 +42,11 @@ class CreateMetsBrowsing : AbstractProcessor() {
     private var relationships: MutableSet<Relationship> = mutableSetOf()
 
     companion object {
-        val OBJECT_ID: PropertyDescriptor = PropertyDescriptor.Builder()
-            .name("object_id")
-            .displayName("Object ID")
-            .description("Object identifier (e.g., pliktmonografi_000040956)")
+        val OBJECT_FOLDER: PropertyDescriptor = PropertyDescriptor.Builder()
+            .name("object_folder")
+            .displayName("Object Folder")
+            .description("Absolute path to the object folder. The folder name (last path component) is used as the Object ID. " +
+                    "Example: /data/objects/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72")
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .required(true)
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
@@ -54,36 +55,41 @@ class CreateMetsBrowsing : AbstractProcessor() {
         val ALTO_FOLDER: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("alto_folder")
             .displayName("ALTO Folder")
-            .description("Folder containing ALTO XML files")
+            .description("Path to ALTO XML files. Can be relative to the Object Folder (e.g., access/metadata/other/ocr) or absolute.")
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .required(true)
+            .defaultValue("access/metadata/other/ocr")
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
             .build()
 
         val IMAGE_FOLDER: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("image_folder")
             .displayName("Image Folder")
-            .description("Folder containing JP2 image files")
+            .description("Path to JP2 image files. Can be relative to the Object Folder (e.g., access/data) or absolute.")
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .required(true)
+            .defaultValue("access/data")
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
             .build()
 
         val JHOVE_FOLDER: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("jhove_folder")
             .displayName("JHOVE Folder")
-            .description("Folder containing JHOVE XML metadata files for JP2 images")
+            .description("Path to JHOVE XML metadata files. Can be relative to the Object Folder (e.g., access/metadata/technical/jhove) or absolute.")
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .required(true)
+            .defaultValue("access/metadata/technical/jhove")
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
             .build()
 
         val OUTPUT_FILE: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("output_file")
             .displayName("Output File")
-            .description("Path to output METS-browsing XML file")
+            .description("Path for the output METS-browsing XML file. Can be relative to the Object Folder " +
+                    "(e.g., access/metadata/METS-browsing.xml) or an absolute path.")
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .required(true)
+            .defaultValue("METS-browsing.xml")
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
             .build()
 
@@ -129,7 +135,7 @@ class CreateMetsBrowsing : AbstractProcessor() {
     }
 
     override fun init(context: ProcessorInitializationContext) {
-        descriptors.add(OBJECT_ID)
+        descriptors.add(OBJECT_FOLDER)
         descriptors.add(ALTO_FOLDER)
         descriptors.add(IMAGE_FOLDER)
         descriptors.add(JHOVE_FOLDER)
@@ -158,11 +164,11 @@ class CreateMetsBrowsing : AbstractProcessor() {
 
         try {
             // Extract properties
-            val objId = context.getProperty(OBJECT_ID).evaluateAttributeExpressions(flowFile).value
-            val altoFolderPath = context.getProperty(ALTO_FOLDER).evaluateAttributeExpressions(flowFile).value
-            val imageFolderPath = context.getProperty(IMAGE_FOLDER).evaluateAttributeExpressions(flowFile).value
-            val jhoveFolderPath = context.getProperty(JHOVE_FOLDER).evaluateAttributeExpressions(flowFile).value
-            val outputFilePath = context.getProperty(OUTPUT_FILE).evaluateAttributeExpressions(flowFile).value
+            val objectFolderPath = context.getProperty(OBJECT_FOLDER).evaluateAttributeExpressions(flowFile).value
+            val altoFolderRelative = context.getProperty(ALTO_FOLDER).evaluateAttributeExpressions(flowFile).value
+            val imageFolderRelative = context.getProperty(IMAGE_FOLDER).evaluateAttributeExpressions(flowFile).value
+            val jhoveFolderRelative = context.getProperty(JHOVE_FOLDER).evaluateAttributeExpressions(flowFile).value
+            val outputFileRelative = context.getProperty(OUTPUT_FILE).evaluateAttributeExpressions(flowFile).value
             val agentName = context.getProperty(AGENT_NAME).evaluateAttributeExpressions(flowFile).value ?: "nifi-tekst-bundle"
             val metsVersionStr = context.getProperty(METS_VERSION).value ?: "METS_2"
             val mixVersionStr = context.getProperty(MIX_VERSION).value ?: "MIX_2_0"
@@ -171,26 +177,44 @@ class CreateMetsBrowsing : AbstractProcessor() {
             val metsVersion = MetsVersion.valueOf(metsVersionStr)
             val mixVersion = MixVersion.valueOf(mixVersionStr)
 
-            val altoFolder = File(altoFolderPath)
-            val imageFolder = File(imageFolderPath)
-            val jhoveFolder = File(jhoveFolderPath)
-            val outputFile = File(outputFilePath)
+            // Resolve object folder and extract Object ID from folder name
+            val objectFolder = File(objectFolderPath)
+            val objId = objectFolder.name
+
+            if (!objectFolder.exists() || !objectFolder.isDirectory) {
+                logger.error("Object folder does not exist: $objectFolderPath")
+                session.transfer(flowFile, REL_FAILURE)
+                return
+            }
+
+            // Resolve paths - can be absolute or relative to object folder
+            val altoFolderSpec = File(altoFolderRelative)
+            val altoFolder = if (altoFolderSpec.isAbsolute) altoFolderSpec else File(objectFolder, altoFolderRelative)
+
+            val imageFolderSpec = File(imageFolderRelative)
+            val imageFolder = if (imageFolderSpec.isAbsolute) imageFolderSpec else File(objectFolder, imageFolderRelative)
+
+            val jhoveFolderSpec = File(jhoveFolderRelative)
+            val jhoveFolder = if (jhoveFolderSpec.isAbsolute) jhoveFolderSpec else File(objectFolder, jhoveFolderRelative)
+
+            val outputFileSpec = File(outputFileRelative)
+            val outputFile = if (outputFileSpec.isAbsolute) outputFileSpec else File(objectFolder, outputFileRelative)
 
             // Validate folders exist
             if (!altoFolder.exists() || !altoFolder.isDirectory) {
-                logger.error("ALTO folder does not exist: $altoFolderPath")
+                logger.error("ALTO folder does not exist: ${altoFolder.absolutePath}")
                 session.transfer(flowFile, REL_FAILURE)
                 return
             }
 
             if (!imageFolder.exists() || !imageFolder.isDirectory) {
-                logger.error("Image folder does not exist: $imageFolderPath")
+                logger.error("Image folder does not exist: ${imageFolder.absolutePath}")
                 session.transfer(flowFile, REL_FAILURE)
                 return
             }
 
             if (!jhoveFolder.exists() || !jhoveFolder.isDirectory) {
-                logger.error("JHOVE folder does not exist: $jhoveFolderPath")
+                logger.error("JHOVE folder does not exist: ${jhoveFolder.absolutePath}")
                 session.transfer(flowFile, REL_FAILURE)
                 return
             }
@@ -203,13 +227,13 @@ class CreateMetsBrowsing : AbstractProcessor() {
                 ?.sortedBy { it.name } ?: emptyList()
 
             if (altoFiles.isEmpty()) {
-                logger.error("No ALTO XML files found in: $altoFolderPath")
+                logger.error("No ALTO XML files found in: ${altoFolder.absolutePath}")
                 session.transfer(flowFile, REL_FAILURE)
                 return
             }
 
             if (imageFiles.isEmpty()) {
-                logger.error("No JP2 image files found in: $imageFolderPath")
+                logger.error("No JP2 image files found in: ${imageFolder.absolutePath}")
                 session.transfer(flowFile, REL_FAILURE)
                 return
             }

@@ -18,7 +18,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <properties>
-        <kotlin.version>2.1.10</kotlin.version>
+        <kotlin.version>1.9.22</kotlin.version>
     </properties>
 
     <parent>
@@ -139,11 +139,6 @@
             <artifactId>commons-mets</artifactId>
             <version>2.0.0-3</version>
         </dependency>
-<!--        <dependency>
-            <groupId>no.nb.commons</groupId>
-            <artifactId>commons-metadata</artifactId>
-            <version>2.0.0-3</version>
-        </dependency>-->
         <dependency>
             <groupId>no.nb.commons</groupId>
             <artifactId>commons-mix</artifactId>
@@ -223,6 +218,7 @@
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-mock</artifactId>
+            <version>${nifi.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -240,7 +236,15 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
+            <version>2.0.3</version>
             <scope>test</scope>
+        </dependency>
+        <!-- Commons IO added because testcontainers had a bug https://github.com/testcontainers/testcontainers-java/issues/11481 -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.21.0</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -258,50 +262,9 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
             <version>5.10.2</version>
+            <version>1.21.4</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
-    <repositories>
-<!--        <repository>
-            <id>releases</id>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <name>Release versjoner av NB software</name>
-            <url>https://artifactory.nb.no/artifactory/libs-release-local</url>
-        </repository>
-        <repository>
-            <releases/>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>releases_rest</id>
-            <name>The rest</name>
-            <url>https://artifactory.nb.no/artifactory/libs-release</url>
-        </repository>-->
-        <repository>
-            <releases/>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>releases</id>
-            <name>Release versjoner av NB software</name>
-            <url>https://tools.nb.no/artifactory/libs-release-local</url>
-        </repository>
-        <repository>
-            <releases/>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>releases_rest</id>
-            <name>The rest</name>
-            <url>https://tools.nb.no/artifactory/libs-release</url>
-        </repository>
-        <repository>
-            <id>maven_central</id>
-            <name>Maven Central</name>
-            <url>https://repo.maven.apache.org/maven2/</url>
-        </repository>
-    </repositories>
 </project>

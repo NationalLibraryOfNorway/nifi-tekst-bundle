@@ -1,0 +1,16 @@
+services:
+  nifi:
+    image: apache/nifi:2.3.0
+    container_name: nifi
+    ports:
+      - "8443:8443"
+    environment:
+      - SINGLE_USER_CREDENTIALS_USERNAME=admin
+      - SINGLE_USER_CREDENTIALS_PASSWORD=adminadminadmin
+      - NIFI_WEB_HTTPS_PORT=8443
+      - NIFI_SENSITIVE_PROPS_KEY=local-dev-key-12345
+    volumes:
+      - ./nifi-tekst-bundle-nar/target:/opt/nifi/nifi-current/nar_extensions:ro
+      - ./nifi-tekst-bundle-processors/src/test/resources:/data/test-resources:ro
+      - ./nifi-docker/output:/data/output
+    restart: unless-stopped
