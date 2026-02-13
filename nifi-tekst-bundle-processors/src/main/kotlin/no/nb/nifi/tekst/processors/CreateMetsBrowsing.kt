@@ -16,6 +16,7 @@
  */
 package no.nb.nifi.tekst.processors
 
+import no.nb.nifi.tekst.jhove.JhoveParser
 import no.nb.nifi.tekst.mets.*
 import no.nb.nifi.tekst.validation.XsdValidator
 import org.apache.nifi.annotation.behavior.SideEffectFree
@@ -28,8 +29,6 @@ import org.apache.nifi.processor.util.StandardValidators
 import java.io.File
 import java.security.MessageDigest
 import java.util.*
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.xpath.XPathFactory
 
 @Tags("NB", "Tekst", "Text", "METS", "Browsing", "Create")
 @CapabilityDescription(
@@ -257,7 +256,7 @@ class CreateMetsBrowsing : AbstractProcessor() {
                         "Expected JHOVE file at: ${File(jhoveFolder, "JHOVE_${imageFile.name}.xml").absolutePath}. " +
                         "Please ensure all images have been processed through the Jhove processor before generating METS-browsing."
                     )
-                val resolution = extractImageDimensionsFromJhove(jhoveFile)
+                val resolution = JhoveParser(jhoveFile).getImageResolution()
 
                 PageInfo(
                     pageNumber = pageNumber,
@@ -333,29 +332,6 @@ class CreateMetsBrowsing : AbstractProcessor() {
             jhoveFile
         } else {
             null
-        }
-    }
-
-    private fun extractImageDimensionsFromJhove(jhoveFile: File): ImageResolution {
-        try {
-            val factory = DocumentBuilderFactory.newInstance()
-            factory.isNamespaceAware = true
-            val builder = factory.newDocumentBuilder()
-            val doc = builder.parse(jhoveFile)
-
-            val xPath = XPathFactory.newInstance().newXPath()
-
-            // Extract imageWidth and imageHeight from mix namespace
-            val widthExpr = "//*[local-name()='imageWidth']/text()"
-            val heightExpr = "//*[local-name()='imageHeight']/text()"
-
-            val width = xPath.evaluate(widthExpr, doc)?.toIntOrNull() ?: 2127
-            val height = xPath.evaluate(heightExpr, doc)?.toIntOrNull() ?: 3387
-
-            return ImageResolution(width = width, height = height)
-        } catch (e: Exception) {
-            logger.error("Failed to parse JHOVE file: ${jhoveFile.absolutePath}", e)
-            return ImageResolution(width = 2127, height = 3387)
         }
     }
 

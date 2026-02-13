@@ -1,14 +1,13 @@
 package no.nb.nifi.tekst.jhove
 
 import no.nb.nifi.tekst.exceptions.MetsCreateException
+import no.nb.nifi.tekst.mets.ImageResolution
 import no.nb.nifi.tekst.util.XmlHelper
 import org.w3c.dom.Document
-import org.w3c.dom.NodeList
 import java.io.File
 import java.io.IOException
 import java.math.BigDecimal
 import java.math.BigInteger
-import kotlin.math.pow
 
 class JhoveParser(file: File) {
     private var document: Document? = null
@@ -17,7 +16,8 @@ class JhoveParser(file: File) {
 
     init {
         val parts = file.name.split(".")
-        fileSuffix = parts[parts.size - 2] // TODO? check if we can just hard code this for METS-browsing.xml (jp2)
+        // Gets original file suffix, which is the second to last part of the filename (e.g. "jp2" in "JHOVE_<URN>_001.jp2.xml")
+        fileSuffix = parts[parts.size - 2]
 
         try {
             document = XmlHelper.loadDocument(file, false)
@@ -26,7 +26,6 @@ class JhoveParser(file: File) {
         }
     }
 
-    // TODO do we need to set getters?
     val imageWidth: BigInteger = getValueAsBigInt("//*[local-name()='BasicImageCharacteristics']/*[local-name()='imageWidth']") ?: throw MetsCreateException("Unable to get image width")
 
     val imageHeigth: BigInteger = getValueAsBigInt("//*[local-name()='BasicImageCharacteristics']/*[local-name()='imageHeight']") ?: throw MetsCreateException("Unable to get image height")
@@ -140,6 +139,21 @@ class JhoveParser(file: File) {
                 val file = File(uriString)
                 return file.name
         }
+
+    /**
+     * Extracts image dimensions and returns an ImageResolution object.
+     * Falls back to default values (2127x3387) if dimensions cannot be extracted.
+     */
+    fun getImageResolution(): ImageResolution {
+        return try {
+            ImageResolution(
+                width = imageWidth.toInt(),
+                height = imageHeigth.toInt()
+            )
+        } catch (e: MetsCreateException) {
+            ImageResolution(width = 2127, height = 3387)
+        }
+    }
 
     @Throws(MetsCreateException::class)
     private fun getValueAsInt(expression: String): Int? {
