@@ -144,30 +144,27 @@ class ReorderFiles : AbstractProcessor() {
             val rootNode: JsonNode = mapper.readTree(flowFileJson)
 
             val batchId = rootNode.get("batchId")?.asText()
-            val changes = rootNode.get("change")
+            val changes = rootNode.get("changes")
             val renameInstructions = mutableListOf<RenameInstruction>()
             val newOrder = mutableListOf<String>()
 
-            val changeList = mutableListOf<Map<String, Any>>()
+            val items = mutableListOf<Map<String, Any>>()
 
             if (changes != null && changes.isArray) {
                 for (change in changes) {
                     var itemId: String = change.get("itemId").asText() ?: ""
 
-                    //In case a new object without an itemId
                     if(itemId.isBlank() || itemId == "null") {
                         itemId = randomUUID().toString()
                     }
 
-                    val orderedImages = change.get("newOrder")
-
+                    val orderedImages = change.get("orderedImageIds")
                     val itemInstruction = addInstruction(itemId, orderedImages, zeroPadding)
                     renameInstructions += itemInstruction
                     val itemNewOrder = itemInstruction.map { it.newName }
                     newOrder += itemNewOrder
 
-                    // Collect per-item change
-                    changeList.add(mapOf("itemId" to itemId, "newOrder" to itemNewOrder))
+                    items.add(mapOf("itemId" to itemId, "pages" to itemNewOrder.size))
 
                     deleteOcrFiles(itemId, baseDirFile)
                 }
@@ -179,7 +176,12 @@ class ReorderFiles : AbstractProcessor() {
                 val outputJson = mapper.writeValueAsString(
                     mapOf(
                         "batchId" to batchId,
-                        "change" to changeList
+                        "items" to items,
+                        "font" to rootNode.get("font").asText(),
+                        "materialType" to rootNode.get("materialType").asText(),
+                        "publicationType" to rootNode.get("publicationType").asText(),
+                        "language" to rootNode.get("language").asText(),
+                        "digital" to rootNode.get("digital").asBoolean()
                     )
                 )
 
