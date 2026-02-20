@@ -3,14 +3,17 @@ package no.nb.nifi.tekst.processors
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
+import no.nb.utils.UUIDv7
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.nio.file.Path
 
 class ReorderFilesTest {
     private val reorderFiles = ReorderFiles()
     private val mapper = ObjectMapper()
+    val baseDir: Path = createTempDir().toPath().normalize()
 
     private fun stripPath(entries: List<Map<String, String>>): List<Map<String, String>> =
         entries.map { entry -> entry.mapValues { (_, v) -> v.substringAfterLast('/') } }
@@ -33,7 +36,7 @@ class ReorderFilesTest {
         val firstChange = changes[0]
         val itemId = firstChange["itemId"].asText()
         val newOrder = firstChange["newOrder"]
-        val renameInstructions = reorderFiles.addInstruction(itemId, newOrder, "%05d")
+        val renameInstructions = reorderFiles.addInstruction(itemId, newOrder, "%05d", baseDir)
 
         val renameList = mapper.convertValue(renameInstructions, List::class.java) as List<Map<String, String>>
         val actualOrder = stripPath(renameList)
@@ -44,8 +47,7 @@ class ReorderFilesTest {
     @Test
     fun `deleteOcr removes all files in ocr folder but keeps the folder`() {
         val itemId = "testItem"
-        val baseDir = createTempDir()
-        val ocrDir = File(baseDir, "$itemId/access/metadata/other/ocr")
+        val ocrDir = baseDir.resolve("$itemId/access/metadata/other/ocr").toFile()
         ocrDir.mkdirs()
         val file1 = File(ocrDir, "ocr1.xml").apply { writeText("text1") }
         val file2 = File(ocrDir, "ocr2.xml").apply { writeText("text2") }
@@ -63,7 +65,6 @@ class ReorderFilesTest {
     @Test
     fun `processor generates itemId for missing itemId in flowfile json`() {
         val reorderFiles = ReorderFiles()
-        val mapper = ObjectMapper()
         val zeroPadding = "%05d"
 
         // Read and modify flowfile.json
@@ -74,10 +75,10 @@ class ReorderFilesTest {
         for (change in changes) {
             var itemId: String = change.get("itemId")?.asText() ?: ""
             if (itemId.isBlank() || itemId == "null") {
-                itemId = no.nb.utils.UUIDv7.randomUUID().toString()
+                itemId = UUIDv7.randomUUID().toString()
             }
             val orderedImages = change.get("newOrder")
-            val itemInstruction = reorderFiles.addInstruction(itemId, orderedImages, zeroPadding)
+            val itemInstruction = reorderFiles.addInstruction(itemId, orderedImages, zeroPadding, baseDir)
             val itemNewOrder = itemInstruction.map { it.newName }
             changeList.add(mapOf("itemId" to itemId, "newOrder" to itemNewOrder))
         }
