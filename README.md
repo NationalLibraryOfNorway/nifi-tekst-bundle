@@ -10,6 +10,7 @@ Bundle av prosessorer laget for produksjonsløyper for tekstmateriale.
 * JDK 21 og Maven (for å bygge NAR-pakken)
 * [Git LFS](https://git-lfs.com/) (for å laste ned testfiler med store størrelser).
   * [Installeringsinstruksjoner](https://github.com/git-lfs/git-lfs?tab=readme-ov-file#installing)
+  * OBS: Installering av Git LFS må gjøres før kloning av repoet, ellers vil ikke testfiler lastes ned. Hvis du allerede har klonet repoet, kjør `git lfs install` og deretter `git lfs pull` i repo-mappen.
 
 ### Bygg og start
 
