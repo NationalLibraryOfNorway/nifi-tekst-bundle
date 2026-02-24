@@ -4,22 +4,46 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import no.nb.models.RenameInstruction
 import no.nb.utils.RenameUtils.renameAll
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.io.path.createTempDirectory
 
-object RenameAllManualTest {
+class RenameUtilsTest {
 
     private val mapper = ObjectMapper()
+    private lateinit var jsonFile: JsonNode
+    private lateinit var tempRoot: File
 
-    private fun readFile(fileName: String): JsonNode {
+    private val renameInstructions: List<RenameInstruction>
+        get() = jsonFile["renameInstructions"].map { node ->
+            RenameInstruction(
+                originalName = node["originalName"].asText(),
+                newName = node["newName"].asText()
+            )
+        }
+
+
+    private fun readFile(): JsonNode {
         val resource = this::class.java.classLoader
-            .getResource("reorder-files/$fileName")
-            ?: error("Resource not found: reorder-files/$fileName")
+            .getResource("reorder-files/renameInstructions.json")
+            ?: error("Resource not found: reorder-files/renameInstructions.json")
 
         return mapper.readTree(File(resource.toURI()))
+    }
+
+    @BeforeEach
+    fun setUp() {
+        jsonFile = readFile()
+        tempRoot = copyResourceDirToTemp()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        tempRoot.deleteRecursively()
     }
 
     /**
@@ -31,7 +55,7 @@ object RenameAllManualTest {
         val targetRoot = File(tempDir, "tmp").apply { mkdirs() }
 
         val reorderFilesUrl = requireNotNull(
-            RenameAllManualTest::class.java.classLoader.getResource("reorder-files")
+            RenameUtilsTest::class.java.classLoader.getResource("reorder-files")
         ) { "reorder-files not found on classpath" }
 
         val resourceRoot = File(reorderFilesUrl.toURI())
@@ -49,38 +73,25 @@ object RenameAllManualTest {
         return targetRoot
     }
 
-    private fun getDataDirs(baseDir: File, itemId: String): Pair<File, File> {
-        val access = File(baseDir, "$itemId/representations/access/data")
-        val primary = File(baseDir, "$itemId/representations/primary/data")
+    private fun getDataDirs(baseDir: File, folderName: String): Pair<File, File> {
+        val access = File(baseDir, "$folderName/representations/access/data")
+        val primary = File(baseDir, "$folderName/representations/primary/data")
         return access to primary
     }
 
     @Test
     fun `renameAll using renameInstructions`() {
-        val tempRoot = copyResourceDirToTemp()
-        val jsonFile = readFile("renameInstructions.json")
-
-        val renameInstructions =
-            jsonFile["renameInstructions"].map { node ->
-                RenameInstruction(
-                    originalName = node["originalName"].asText(),
-                    newName = node["newName"].asText()
-                )
-            }
-
         // Pre-check
         renameInstructions.forEach { instruction ->
-            val itemId = instruction.originalName.substringBefore('_')
-            val (accessDir, primaryDir) = getDataDirs(tempRoot, itemId)
-
+            val folderName = instruction.originalName.substringBeforeLast('_')
+            val (accessDir, primaryDir) = getDataDirs(tempRoot, folderName)
             assertTrue(File(accessDir, instruction.originalName).exists())
             assertTrue(File(primaryDir, instruction.originalName).exists())
         }
-
         renameAll(tempRoot.toPath(), renameInstructions)
 
         val expectedByItem = renameInstructions
-            .groupBy { it.newName.substringBefore('_') }
+            .groupBy { it.newName.substringBeforeLast('_') }
             .mapValues { (_, instructions) -> instructions.map { it.newName }.toSet() }
 
         expectedByItem.forEach { (itemId, expectedNames) ->
@@ -93,18 +104,8 @@ object RenameAllManualTest {
 
     @Test
     fun `renameAll does nothing when originalName equals newName`() {
-        val tempRoot = copyResourceDirToTemp()
-        val jsonFile = readFile("renameInstructions.json")
-
         // Get similar instructions
-        val renameInstructions = jsonFile["renameInstructions"]
-            .filter { node -> node["originalName"].asText() == node["newName"].asText() }
-            .map { node ->
-                RenameInstruction(
-                    originalName = node["originalName"].asText(),
-                    newName = node["newName"].asText()
-                )
-            }
+        val similarInstructions: List<RenameInstruction> = renameInstructions.filter { it.originalName == it.newName }
 
         // Capture pre-state
         val preState = tempRoot.walkTopDown()
@@ -112,7 +113,7 @@ object RenameAllManualTest {
             .map { it.relativeTo(tempRoot).path }
             .toSet()
 
-        renameAll(tempRoot.toPath(), renameInstructions)
+        renameAll(tempRoot.toPath(), similarInstructions)
 
         // Capture post-state
         val postState = tempRoot.walkTopDown()
@@ -125,16 +126,6 @@ object RenameAllManualTest {
 
     @Test
     fun `renameAll cleans up temporary directory`() {
-        val tempRoot = copyResourceDirToTemp()
-        val jsonFile = readFile("renameInstructions.json")
-
-        val renameInstructions = jsonFile["renameInstructions"].map { node ->
-            RenameInstruction(
-                originalName = node["originalName"].asText(),
-                newName = node["newName"].asText()
-            )
-        }
-
         renameAll(tempRoot.toPath(), renameInstructions)
 
         // Assert no temp_conflicts_ directory remains

@@ -66,6 +66,8 @@ class ReorderFiles : AbstractProcessor() {
             .description("Failed processing")
             .name("failure")
             .build()
+
+        private const val TEKST_PREFIX = "tekst_"
     }
 
     override fun init(context: ProcessorInitializationContext) {
@@ -119,20 +121,21 @@ class ReorderFiles : AbstractProcessor() {
         baseDirPath: Path
     ): List<RenameInstruction> {
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
-
+        val folderName = "$TEKST_PREFIX$itemId"
         val listOfInstructions = mutableListOf<RenameInstruction>()
 
         orderedImages?.forEachIndexed { index, imageName ->
             val rawName = imageName.asText()
             require(isSafeName(rawName)) { "Invalid image name: $rawName" }
+            val prefixedName = if (rawName.startsWith(TEKST_PREFIX)) rawName else "$TEKST_PREFIX$rawName"
 
-            val originalName = if (rawName.endsWith(".jp2", ignoreCase = true)) rawName else "$rawName.jp2"
+            val originalName = if (prefixedName.endsWith(".jp2", ignoreCase = true)) prefixedName else "$prefixedName.jp2"
             val pageNumber = String.format(zeroPadding, index + 1)
-            val newName = "${itemId}_$pageNumber.jp2"
+            val newName = "$TEKST_PREFIX${itemId}_$pageNumber.jp2"
 
             // Verify both original and new paths stay within base dir
-            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(itemId).resolve(originalName))
-            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(itemId).resolve(newName))
+            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(originalName))
+            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
 
             listOfInstructions.add(RenameInstruction(originalName, newName))
         }
@@ -143,8 +146,8 @@ class ReorderFiles : AbstractProcessor() {
     fun deleteOcrFiles(itemId: String, baseDirPath: Path) {
         // itemId must be validated before calling this function
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
-
-        val ocrDirPath = baseDirPath.resolve(itemId).resolve("access/metadata/other/ocr").normalize()
+        val folderName = "$TEKST_PREFIX$itemId"
+        val ocrDirPath = baseDirPath.resolve(folderName).resolve("representations/access/metadata/other/ocr").normalize()
 
         // Ensure ocr dir is within base dir
         requireWithinBaseDir(baseDirPath, ocrDirPath)
@@ -152,7 +155,7 @@ class ReorderFiles : AbstractProcessor() {
         val ocrDir = ocrDirPath.toFile()
         if (ocrDir.exists() && ocrDir.isDirectory) {
             ocrDir.listFiles()?.forEach { file ->
-                if (file.isFile) {
+                if (file.isFile && file.name.endsWith(".xml", ignoreCase = true)) {
                     // Extra safety: verify each file is within base dir before deleting
                     requireWithinBaseDir(baseDirPath, file.toPath())
                     file.delete()
