@@ -86,7 +86,10 @@ class ReorderFilesTest {
 
         // Assert that the last entry's itemId is a valid UUID
         val generatedItemId = changeList.last()["itemId"] as String
-        assertTrue(generatedItemId.matches(Regex("^[0-9a-fA-F-]{36}$")), "Generated itemId should be a UUID")
+        assertTrue(
+            generatedItemId.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")),
+            "Generated itemId should be a valid UUID"
+        )
         val newOrder = changeList.last()["orderedImageIds"] as List<*>
         assertEquals(listOf("tekst_${generatedItemId}_00001.jp2"), newOrder)
     }

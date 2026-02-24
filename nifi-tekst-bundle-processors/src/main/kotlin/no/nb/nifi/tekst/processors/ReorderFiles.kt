@@ -119,8 +119,8 @@ class ReorderFiles : AbstractProcessor() {
 
     /** Example of entries when ItemId=ID1 and zeroPadding="%02d"
      * entries: [
-     *   {originalName: ID1_01.jpg, newName: ID1_01.jp2},
-     *   {originalName: ID2_04.jpg, newName: ID1_02.jp2}]
+     *   {originalName: ID1_01.jp2, newName: ID1_01.jp2},
+     *   {originalName: ID2_04.jp2, newName: ID1_02.jp2}]
      */
     fun addInstruction(
         itemId: String,
