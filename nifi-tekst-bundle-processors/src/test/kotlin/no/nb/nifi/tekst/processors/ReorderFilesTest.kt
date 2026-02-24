@@ -51,12 +51,12 @@ class ReorderFilesTest {
 
     @Test
     fun `deleteOcr removes all files in ocr folder but keeps the folder`() {
-        val itemId = "testItem"
+        val itemId = UUIDv7.randomUUID().toString()
         val folderName = "tekst_$itemId"
         val ocrDir = baseDir.resolve("$folderName/representations/access/metadata/other/ocr").toFile()
         ocrDir.mkdirs()
-        val file1 = File(ocrDir, "tekst_testItem.xml").apply { writeText("text1") }
-        val file2 = File(ocrDir, "tekst_testItem.xml").apply { writeText("text2") }
+        val file1 = File(ocrDir, "${folderName}_00001.xml").apply { writeText("text1") }
+        val file2 = File(ocrDir, "${folderName}_00002.xml").apply { writeText("text2") }
 
         assertTrue(file1.exists())
         assertTrue(file2.exists())

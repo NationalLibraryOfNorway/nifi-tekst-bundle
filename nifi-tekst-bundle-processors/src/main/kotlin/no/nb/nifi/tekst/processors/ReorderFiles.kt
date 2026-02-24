@@ -3,6 +3,7 @@ package no.nb.nifi.tekst.processors
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import no.nb.models.RenameInstruction
+import no.nb.utils.RenameUtils
 import no.nb.utils.RenameUtils.renameAll
 import no.nb.utils.UUIDv7.randomUUID
 import org.apache.nifi.annotation.behavior.DynamicProperty
@@ -16,6 +17,7 @@ import org.apache.nifi.flowfile.FlowFile
 import org.apache.nifi.processor.*
 import org.apache.nifi.processor.exception.ProcessException
 import org.apache.nifi.processor.util.StandardValidators
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
@@ -36,6 +38,7 @@ import java.util.*
 class ReorderFiles : AbstractProcessor() {
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
     private var relationships: MutableSet<Relationship> = mutableSetOf()
+    private val logger = LoggerFactory.getLogger(RenameUtils::class.java)
 
     companion object {
         val BASE_DIR: PropertyDescriptor = PropertyDescriptor.Builder()
@@ -91,11 +94,15 @@ class ReorderFiles : AbstractProcessor() {
      * Disallows path traversal sequences and path separator characters.
      */
     private fun isSafeName(name: String): Boolean {
-        return name.isNotBlank() &&
+        val safe = name.isNotBlank() &&
                 !name.contains("..") &&
                 !name.contains("/") &&
                 !name.contains("\\") &&
-                !name.contains("\u0000") // null byte
+                !name.contains("\u0000")
+        if (!safe) {
+            logger.warn("Validation failed for name: '{}'", name)
+        }
+        return safe
     }
 
     /**
@@ -104,8 +111,9 @@ class ReorderFiles : AbstractProcessor() {
      */
     private fun requireWithinBaseDir(baseDirPath: Path, resolvedPath: Path) {
         val normalized = resolvedPath.normalize()
-        require(normalized.startsWith(baseDirPath.normalize())) {
-            "Path traversal detected: $resolvedPath is outside base directory $baseDirPath"
+        if (!normalized.startsWith(baseDirPath.normalize())) {
+            logger.error("Path traversal detected: {} is outside base directory {}", resolvedPath, baseDirPath)
+            throw SecurityException("Path traversal detected: $resolvedPath is outside base directory $baseDirPath")
         }
     }
 
@@ -120,6 +128,7 @@ class ReorderFiles : AbstractProcessor() {
         zeroPadding: String,
         baseDirPath: Path
     ): List<RenameInstruction> {
+        logger.info("Adding rename instructions for itemId='{}', images={}", itemId, orderedImages?.size() ?: 0)
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
         val folderName = "$TEKST_PREFIX$itemId"
         val listOfInstructions = mutableListOf<RenameInstruction>()
@@ -137,6 +146,7 @@ class ReorderFiles : AbstractProcessor() {
             requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(originalName))
             requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
 
+            logger.warn("Invalid image name encountered: '{}'", rawName)
             listOfInstructions.add(RenameInstruction(originalName, newName))
         }
 
@@ -149,34 +159,41 @@ class ReorderFiles : AbstractProcessor() {
         val folderName = "$TEKST_PREFIX$itemId"
         val ocrDirPath = baseDirPath.resolve(folderName).resolve("representations/access/metadata/other/ocr").normalize()
 
+        logger.info("Attempting to delete OCR files for itemId={} in directory: {}", itemId, ocrDirPath)
+
         // Ensure ocr dir is within base dir
         requireWithinBaseDir(baseDirPath, ocrDirPath)
 
         val ocrDir = ocrDirPath.toFile()
         if (ocrDir.exists() && ocrDir.isDirectory) {
-            ocrDir.listFiles()?.forEach { file ->
-                if (file.isFile && file.name.endsWith(".xml", ignoreCase = true)) {
-                    // Extra safety: verify each file is within base dir before deleting
-                    requireWithinBaseDir(baseDirPath, file.toPath())
-                    file.delete()
-                }
+            val files = ocrDir.listFiles()?.filter { it.isFile && it.name.endsWith(".xml", ignoreCase = true) } ?: emptyList()
+            logger.info("Found {} OCR XML files to delete in {}", files.size, ocrDirPath)
+            files.forEach { file ->
+                requireWithinBaseDir(baseDirPath, file.toPath())
+                val deleted = file.delete()
+                logger.info("Deleting file {}: {}", file.absolutePath, if (deleted) "SUCCESS" else "FAILED")
             }
+        } else {
+            logger.info("OCR directory does not exist or is not a directory: {}", ocrDirPath)
         }
     }
 
     override fun onTrigger(context: ProcessContext, session: ProcessSession) {
         var flowFile: FlowFile = session.get() ?: return
         try {
+            logger.info("Starting onTrigger for flowFile id={}", flowFile.id)
             val zeroPadding = context.getProperty(RENAME_ZERO_PAD_STRING).evaluateAttributeExpressions(flowFile).value ?: "%05d"
             val baseDirValue = context.getProperty(BASE_DIR)
                 .evaluateAttributeExpressions(flowFile)
                 .value
                 ?: throw ProcessException("base_dir property is missing")
 
+            logger.info("Using baseDir='{}', zeroPadding='{}'", baseDirValue, zeroPadding)
             val baseDirFile = File(baseDirValue).canonicalFile
             val baseDirPath = baseDirFile.toPath().normalize()
 
             if (!baseDirFile.exists() || !baseDirFile.isDirectory) {
+                logger.error("Invalid base directory: {}", baseDirFile)
                 throw ProcessException("Invalid base directory: $baseDirFile")
             }
 
@@ -195,6 +212,8 @@ class ReorderFiles : AbstractProcessor() {
             val renameInstructions = mutableListOf<RenameInstruction>()
             val newOrder = mutableListOf<String>()
             val items = mutableListOf<Map<String, Any>>()
+
+            logger.info("Parsed JSON for batchId='{}', changes count={}", batchId, changes?.size() ?: 0)
 
             if (changes != null && changes.isArray) {
                 for (change in changes) {
@@ -240,6 +259,7 @@ class ReorderFiles : AbstractProcessor() {
             }
 
             session.transfer(flowFile, REL_SUCCESS)
+            logger.info("Wrote output JSON for batchId={}", batchId)
 
         } catch (exception: Exception) {
             logger.error("Failed to reorder files", exception)
