@@ -19,6 +19,7 @@ package no.nb.nifi.tekst.processors
 import io.minio.DownloadObjectArgs
 import io.minio.ListObjectsArgs
 import io.minio.MinioClient
+import io.minio.Result
 import io.minio.messages.Item
 import org.apache.nifi.annotation.behavior.SideEffectFree
 import org.apache.nifi.annotation.documentation.CapabilityDescription
@@ -202,6 +203,7 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
                 .builder()
                 .bucket(bucket)
                 .prefix(prefix)
+                .recursive(true)
                 .build()
         )
     }
@@ -211,7 +213,9 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
         prefix: String,
         localFolder: String
     ) {
-        val items: MutableIterable<io.minio.Result<Item>>? = listItemsByPrefix(bucket, addTrailingSlashIfNotPresent(prefix))
+        val items: List<io.minio.Result<Item>>? =
+            listItemsByPrefix(bucket, addTrailingSlashIfNotPresent(prefix))
+                ?.filter { result -> result.get().objectName().last() != '/' } // Filter out "folders" that lists out as objects.
         if (items == null || !items.iterator().hasNext()) {
             logger.error("No items found in bucket $bucket with prefix $prefix")
             throw RuntimeException("No items found in bucket $bucket with prefix $prefix")
@@ -231,15 +235,22 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
                 val objectName: String = mainItem.get().objectName()
                 logger.info("Downloading file $objectName")
 
-                val objNameParts = objectName.split("/".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-                val fileName = objNameParts[objNameParts.size - 1]
+                val relativeS3Path = objectName.substringAfterLast(prefix)
+                // Create directory if it does not exist - nio method does not throw if it exists
+                try {
+                    val path = Paths.get(localFolder + '/' + relativeS3Path.substringBeforeLast('/'))
+                    Files.createDirectories(path)
+                    logger.info("Downloading to $path")
+                } catch (e: IOException) {
+                    throw RuntimeException(e)
+                }
 
                 client.downloadObject(
                     DownloadObjectArgs
                         .builder()
                         .bucket(bucket)
                         .`object`(objectName)
-                        .filename("$localFolder/$fileName")
+                        .filename("$localFolder/$relativeS3Path")
                         .build()
                 )
 

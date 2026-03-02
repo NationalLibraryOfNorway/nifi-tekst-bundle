@@ -59,6 +59,20 @@ class DownloadMultipleS3FilesByPrefixTest {
                     .filename("src/test/resources/S3-data/logos/NB-logo-no-hvit.png")
                     .build()
             )
+            minioClient.uploadObject(
+                UploadObjectArgs.builder()
+                    .bucket(BUCKET)
+                    .`object`("NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23/representations/primary/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
+                    .filename("src/test/resources/S3-data/logos/NB-logo-no-hvit.png")
+                    .build()
+            )
+            minioClient.uploadObject(
+                UploadObjectArgs.builder()
+                    .bucket(BUCKET)
+                    .`object`("NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23/representations/access/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
+                    .filename("src/test/resources/S3-data/logos/NB-logo-no-hvit.png")
+                    .build()
+            )
 
         }
 
@@ -80,6 +94,51 @@ class DownloadMultipleS3FilesByPrefixTest {
         runner.setProperty(DownloadMultipleS3FilesByPrefix.PREFIX, "test-folder")
         runner.setProperty(DownloadMultipleS3FilesByPrefix.ENDPOINT, minioServerUrl)
         runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, "folder2")
+    }
+
+    @Test
+    fun listFilesAndDownloadFilesAccessAndPrimary() {
+        val runner = TestRunners.newTestRunner(DownloadMultipleS3FilesByPrefix::class.java)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.BUCKET, BUCKET)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.ACCESS_KEY, ACCESS_KEY)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.SECRET_KEY, SECRET_KEY)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.REGION, REGION)
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.PREFIX, "NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23")
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.ENDPOINT, minioServerUrl)
+
+        val projectFolder = Paths.get("").toAbsolutePath().toString()
+        val downloadedFilesFolder = "src/test/resources/downloaded-files"
+
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, "$projectFolder/$downloadedFilesFolder")
+
+        runner.enqueue("Hello world")
+
+        runner.run()
+
+        // check that the files are downloaded
+        val downloadedFiles = File(downloadedFilesFolder).listFiles()
+        val representationFile = downloadedFiles!![0].listFiles()
+        val accessFile = representationFile!![0].listFiles()!![0]
+        val primaryFile = representationFile[1].listFiles()!![0]
+
+        assert(accessFile.exists())
+        assert(accessFile.path.endsWith("$downloadedFilesFolder/representations/access/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png"))
+        assert(primaryFile.exists())
+        assert(primaryFile.path.endsWith("$downloadedFilesFolder/representations/primary/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png"))
+        runner.assertAllFlowFilesTransferred("success")
+
+        // clean up
+        cleanUpDownloadedFiles(downloadedFiles)
+        File(downloadedFilesFolder).delete()
+    }
+
+    fun cleanUpDownloadedFiles(files: Array<File>) {
+        files.forEach { file ->
+            val subFiles = file.listFiles()
+            if (subFiles !== null)
+                cleanUpDownloadedFiles(subFiles)
+            file.delete()
+        }
     }
 
     @Test
