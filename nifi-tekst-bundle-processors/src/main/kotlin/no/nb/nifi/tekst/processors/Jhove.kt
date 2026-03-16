@@ -11,8 +11,6 @@ import org.apache.nifi.components.PropertyDescriptor
 import org.apache.nifi.expression.ExpressionLanguageScope
 import org.apache.nifi.processor.*
 import org.apache.nifi.processor.util.StandardValidators
-import org.xml.sax.InputSource
-import java.io.StringReader
 import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -162,23 +160,8 @@ class Jhove : AbstractProcessor() {
         val status: String,
         val isValid: Boolean,
         val isWellFormed: Boolean,
-        val isHardFailure: Boolean = false,
         val errorMessage: String? = null
     )
-
-    private fun createSecureDocumentBuilderFactory(): DocumentBuilderFactory {
-        val factory = DocumentBuilderFactory.newInstance()
-        factory.isNamespaceAware = true
-        factory.isExpandEntityReferences = false
-        try {
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-        } catch (_: Exception) {
-            // Some XML parsers may not support these features.
-        }
-        return factory
-    }
 
     /**
      * Runs JHOVE validation on a single file and returns the validation status.
@@ -205,10 +188,10 @@ class Jhove : AbstractProcessor() {
             jhoveBase.dispatch(jhoveApp, module, null, handler, outputFile.toString(), arrayOf(inputFile.toString()))
 
             // Parse the generated JHOVE XML output to determine status
-            val domFactory = createSecureDocumentBuilderFactory()
+            val domFactory = DocumentBuilderFactory.newInstance()
+            domFactory.isNamespaceAware = true
             val builder = domFactory.newDocumentBuilder()
-            builder.setEntityResolver { _, _ -> InputSource(StringReader("")) }
-			val doc = builder.parse(outputFile.toString())
+            val doc = builder.parse(outputFile.toString())
             val factory = XPathFactory.newInstance()
             val xpath = factory.newXPath()
             xpath.namespaceContext = object : NamespaceContext {
@@ -230,7 +213,6 @@ class Jhove : AbstractProcessor() {
 
             val isValid = status == WELL_FORMED_AND_VALID
             val isWellFormed = status.contains("Well-Formed")
-            val isHardFailure = !isWellFormed
 
             val errorMsg = if (!isValid) {
                 val msgExpr = xpath.compile("/jhove:jhove/jhove:repInfo/jhove:messages/jhove:message")
@@ -246,7 +228,6 @@ class Jhove : AbstractProcessor() {
                 status = status,
                 isValid = isValid,
                 isWellFormed = isWellFormed,
-                isHardFailure = isHardFailure,
                 errorMessage = errorMsg
             )
 
@@ -308,9 +289,7 @@ class Jhove : AbstractProcessor() {
                 logger("JHOVE output failed XSD validation for ${inputFile.fileName}: ${validationResult.getErrorMessage()}")
                 results.add(
                     status.copy(
-                        isValid = false,
-                        isHardFailure = true,
-						errorMessage = if (status.errorMessage.isNullOrBlank()) xsdError else "${status.errorMessage} | $xsdError"
+                        errorMessage = if (status.errorMessage.isNullOrBlank()) xsdError else "${status.errorMessage} | $xsdError"
                     )
                 )
             } else {
@@ -370,12 +349,8 @@ class Jhove : AbstractProcessor() {
 
             val allValid = allValidationResults.all { it.isValid }
             val allWellFormed = allValidationResults.all { it.isWellFormed }
-            val hasHardFailures = allValidationResults.any { it.isHardFailure }
             val errorList = allValidationResults
-                .filter { !it.isValid }
-                .map { status ->
-                    status.errorMessage ?: "${status.filePath.fileName}: ${status.status}"
-                }
+                .mapNotNull { it.errorMessage }
 
             val validationSummary = ValidationResult(
                 allValid = allValid,
@@ -398,14 +373,6 @@ class Jhove : AbstractProcessor() {
                 validationSummary.allValid -> {
                     getLogger().info("All JHOVE validations successful - routing to success")
                     session.transfer(flowFile, SUCCESS_RELATIONSHIP)
-                }
-                hasHardFailures -> {
-                    throw RoutedException(
-                        FAIL_RELATIONSHIP,
-                        false,
-                        "JHOVE validation failed: ${validationSummary.errors.joinToString("; ")}",
-                        null
-                    )
                 }
                 validationSummary.allWellFormed -> {
                     getLogger().info("All files are well-formed but some are not valid - routing to well-formed")
