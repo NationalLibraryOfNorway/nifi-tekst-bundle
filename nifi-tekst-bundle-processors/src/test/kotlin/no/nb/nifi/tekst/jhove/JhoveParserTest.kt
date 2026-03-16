@@ -8,7 +8,7 @@ import java.nio.file.Paths
 class JhoveParserTest {
 
     private val projectFolder = Paths.get("").toAbsolutePath().toString()
-    private val testDataRoot = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/primary"
+    private val testDataRoot = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/representations/primary"
     private val jhoveFolder = "$testDataRoot/metadata/technical/jhove"
 
     @Test

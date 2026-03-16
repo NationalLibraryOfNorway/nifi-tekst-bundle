@@ -12,6 +12,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.xpath.XPathFactory
 
 class JhoveTest {
 
@@ -77,14 +78,22 @@ class JhoveTest {
 
         val doc = parseXmlFile(jhoveOutputFile!!)
 
+        // Verify JHOVE XML structure
         assertEquals("jhove", doc.documentElement.localName, "Root element should be 'jhove'")
 
+        // Verify status element exists
         val status = xpath(doc, "//jhove:repInfo/jhove:status")
         assertNotNull(status, "Status element should exist")
         assertTrue(status!!.startsWith("Well-Formed"), "Status should indicate well-formed file")
 
+        // Verify format
         val format = xpath(doc, "//jhove:repInfo/jhove:format")
         assertEquals("JPEG 2000", format, "Format should be JPEG 2000")
+
+        // Verify checksums exist
+        val md5 = xpath(doc, "//jhove:repInfo/jhove:checksums/jhove:checksum[@type='MD5']")
+        assertNotNull(md5, "MD5 checksum should exist")
+        assertTrue(md5!!.isNotEmpty(), "MD5 checksum should not be empty")
     }
 
     @Test
@@ -195,14 +204,241 @@ class JhoveTest {
         assertEquals("true", flowFile.getAttribute("jhove.all_wellformed"))
     }
 
-    private fun parseXmlFile(file: File): Document {
+    @Test
+    fun testJhoveChecksumGeneration() {
+        val runner = TestRunners.newTestRunner(Jhove::class.java)
+
+        runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
+        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+
+        runner.enqueue("test")
+        runner.run()
+
+        // Find and parse a JHOVE output file for JP2
+        val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
+        val jhoveOutputFile = primaryOutputDir.listFiles { file ->
+            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
+        }?.firstOrNull()
+        assertNotNull(jhoveOutputFile, "JHOVE output file should exist")
+
+        val doc = parseXmlFile(jhoveOutputFile!!)
+
+        // Verify MD5 and SHA-1 checksums are present
+        val md5 = xpath(doc, "//jhove:repInfo/jhove:checksums/jhove:checksum[@type='MD5']")
+        assertNotNull(md5, "MD5 checksum should be generated")
+        assertEquals(32, md5!!.length, "MD5 checksum should be 32 characters")
+
+        val sha1 = xpath(doc, "//jhove:repInfo/jhove:checksums/jhove:checksum[@type='SHA-1']")
+        assertNotNull(sha1, "SHA-1 checksum should be generated")
+        assertEquals(40, sha1!!.length, "SHA-1 checksum should be 40 characters")
+    }
+
+    @Test
+    fun testJhoveMixImageDimensions() {
+        val runner = TestRunners.newTestRunner(Jhove::class.java)
+
+        runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
+        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+
+        runner.enqueue("test")
+        runner.run()
+
+        // Parse a JHOVE output file to verify MIX image dimensions
+        val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
+        val jhoveOutputFiles = primaryOutputDir.listFiles { file ->
+            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
+        }?.sortedBy { it.name }
+        assertNotNull(jhoveOutputFiles, "JHOVE output files should exist")
+        assertTrue(jhoveOutputFiles!!.isNotEmpty(), "Should have JHOVE output files")
+
+        val doc = parseXmlFile(jhoveOutputFiles[0])
+
+        // Verify MIX imageWidth and imageHeight exist
+        val imageWidth = xpathMix(doc, "//mix:BasicImageCharacteristics/mix:imageWidth")
+        assertNotNull(imageWidth, "MIX imageWidth should exist")
+        assertEquals("7133", imageWidth, "imageWidth should be 7133")
+
+        val imageHeight = xpathMix(doc, "//mix:BasicImageCharacteristics/mix:imageHeight")
+        assertNotNull(imageHeight, "MIX imageHeight should exist")
+        assertEquals("8619", imageHeight, "imageHeight should be 8619")
+    }
+
+    @Test
+    fun testJhoveMixSpatialMetrics() {
+        val runner = TestRunners.newTestRunner(Jhove::class.java)
+
+        runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
+        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+
+        runner.enqueue("test")
+        runner.run()
+
+        // Parse a JHOVE output file to verify MIX spatial metrics
+        val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
+        val jhoveOutputFiles = primaryOutputDir.listFiles { file ->
+            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
+        }?.sortedBy { it.name }
+        assertNotNull(jhoveOutputFiles, "JHOVE output files should exist")
+
+        val doc = parseXmlFile(jhoveOutputFiles!![0])
+
+        // Verify MIX spatial metrics exist
+        val samplingFrequencyUnit = xpathMix(doc, "//mix:SpatialMetrics/mix:samplingFrequencyUnit")
+        assertNotNull(samplingFrequencyUnit, "samplingFrequencyUnit should exist")
+        assertEquals("3", samplingFrequencyUnit, "samplingFrequencyUnit should be 3 (cm)")
+
+        // Verify X sampling frequency
+        val xNumerator = xpathMix(doc, "//mix:xSamplingFrequency/mix:numerator")
+        assertNotNull(xNumerator, "xSamplingFrequency numerator should exist")
+        assertEquals("4000000", xNumerator, "xSamplingFrequency numerator should be 4000000")
+
+        val xDenominator = xpathMix(doc, "//mix:xSamplingFrequency/mix:denominator")
+        assertNotNull(xDenominator, "xSamplingFrequency denominator should exist")
+        assertEquals("25400", xDenominator, "xSamplingFrequency denominator should be 25400")
+
+        // Verify Y sampling frequency
+        val yNumerator = xpathMix(doc, "//mix:ySamplingFrequency/mix:numerator")
+        assertNotNull(yNumerator, "ySamplingFrequency numerator should exist")
+        assertEquals("4000000", yNumerator, "ySamplingFrequency numerator should be 4000000")
+
+        val yDenominator = xpathMix(doc, "//mix:ySamplingFrequency/mix:denominator")
+        assertNotNull(yDenominator, "ySamplingFrequency denominator should exist")
+        assertEquals("25400", yDenominator, "ySamplingFrequency denominator should be 25400")
+    }
+
+    @Test
+    fun testJhoveMixDataForAllFiles() {
+        val runner = TestRunners.newTestRunner(Jhove::class.java)
+
+        runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
+        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+
+        runner.enqueue("test")
+        runner.run()
+
+        // Verify all primary JP2 files have MIX data
+        val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
+        val jhoveOutputFiles = primaryOutputDir.listFiles { file ->
+            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
+        }?.sortedBy { it.name }
+
+        assertNotNull(jhoveOutputFiles, "JHOVE output files should exist")
+        assertEquals(4, jhoveOutputFiles?.size, "Should have JHOVE output for each file")
+
+        for (jhoveFile in jhoveOutputFiles!!) {
+            val doc = parseXmlFile(jhoveFile)
+
+            // Verify each file has MIX dimensions
+            val imageWidth = xpathMix(doc, "//mix:BasicImageCharacteristics/mix:imageWidth")
+            assertNotNull(imageWidth, "File ${jhoveFile.name} should have imageWidth")
+            assertTrue(imageWidth!!.toInt() > 0, "imageWidth should be positive")
+
+            val imageHeight = xpathMix(doc, "//mix:BasicImageCharacteristics/mix:imageHeight")
+            assertNotNull(imageHeight, "File ${jhoveFile.name} should have imageHeight")
+            assertTrue(imageHeight!!.toInt() > 0, "imageHeight should be positive")
+
+            // Verify spatial metrics exist
+            val samplingFrequencyUnit = xpathMix(doc, "//mix:SpatialMetrics/mix:samplingFrequencyUnit")
+            assertNotNull(samplingFrequencyUnit, "File ${jhoveFile.name} should have samplingFrequencyUnit")
+        }
+    }
+
+    @Test
+    fun testFullJhoveFileStructureAndMetadata() {
+        val runner = TestRunners.newTestRunner(Jhove::class.java)
+
+        runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
+        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+
+        runner.enqueue("test")
+        runner.run()
+
+        runner.assertTransferCount(Jhove.SUCCESS_RELATIONSHIP, 1)
+
+        val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
+        val jhoveOutputFiles = primaryOutputDir.listFiles { file ->
+            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
+        }?.sortedBy { it.name }
+
+        assertNotNull(jhoveOutputFiles, "JHOVE output files should exist")
+        assertEquals(4, jhoveOutputFiles?.size, "Should have 4 JHOVE output files")
+
+        for (generatedFile in jhoveOutputFiles!!) {
+            assertTrue(generatedFile.exists(), "Generated JHOVE file should exist: ${generatedFile.name}")
+
+            // Verify generated file has correct structure and metadata
+            val validationErrors = validateJhoveXmlStructure(generatedFile)
+            assertTrue(validationErrors.isEmpty(),
+                "Generated JHOVE file has validation errors for ${generatedFile.name}:\n${validationErrors.joinToString("\n")}")
+        }
+    }
+
+    private fun validateJhoveXmlStructure(generatedFile: File): List<String> {
+        val errors = mutableListOf<String>()
+
         val factory = DocumentBuilderFactory.newInstance()
         factory.isNamespaceAware = true
         val builder = factory.newDocumentBuilder()
-        return builder.parse(file)
+        val doc = builder.parse(generatedFile)
+
+        val xpathFactory = XPathFactory.newInstance()
+        val xpath = xpathFactory.newXPath()
+
+        // Validate required elements are present
+        val requiredChecks = mapOf(
+            "//*[local-name()='format']" to "JPEG 2000",
+            "//*[local-name()='status']" to "Well-Formed"
+        )
+
+        for ((xpathExpr, expectedValue) in requiredChecks) {
+            try {
+                val value = xpath.evaluate(xpathExpr, doc)?.trim()
+                if (value.isNullOrEmpty()) {
+                    errors.add("Missing required element: $xpathExpr")
+                } else if (xpathExpr.contains("status")) {
+                    if (!value.startsWith(expectedValue)) {
+                        errors.add("$xpathExpr: expected to start with '$expectedValue', got '$value'")
+                    }
+                } else if (value != expectedValue) {
+                    errors.add("$xpathExpr: expected '$expectedValue', got '$value'")
+                }
+            } catch (e: Exception) {
+                errors.add("Error evaluating $xpathExpr: ${e.message}")
+            }
+        }
+
+        // Validate MIX metadata elements are present
+        val mixElements = listOf(
+            "//*[local-name()='imageWidth']",
+            "//*[local-name()='imageHeight']",
+            "//*[local-name()='samplingFrequencyUnit']",
+            "//*[local-name()='xSamplingFrequency']/*[local-name()='numerator']",
+            "//*[local-name()='xSamplingFrequency']/*[local-name()='denominator']",
+            "//*[local-name()='ySamplingFrequency']/*[local-name()='numerator']",
+            "//*[local-name()='ySamplingFrequency']/*[local-name()='denominator']",
+            "//*[local-name()='checksum'][@type='MD5']",
+            "//*[local-name()='checksum'][@type='SHA-1']"
+        )
+
+        for (xpathExpr in mixElements) {
+            try {
+                val value = xpath.evaluate(xpathExpr, doc)?.trim()
+                if (value.isNullOrEmpty()) {
+                    errors.add("Missing MIX element: $xpathExpr")
+                }
+            } catch (e: Exception) {
+                errors.add("Error evaluating MIX element $xpathExpr: ${e.message}")
+            }
+        }
+
+        return errors
     }
 
-    private fun xpath(doc: Document, expr: String): String? {
-        return XmlHelper.xpath(doc, expr)
-    }
+    // Helper methods for XML parsing (using centralized XmlHelper)
+
+    private fun parseXmlFile(file: File): Document = XmlHelper.parseXmlFile(file)
+
+    private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
+
+    private fun xpathMix(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 }

@@ -11,7 +11,7 @@ class JhoveXsdValidationTest {
 
     private val testResourcesPath = "src/test/resources"
     private val tekstUuid = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
-    private val jhoveFolder = "$testResourcesPath/$tekstUuid/primary/metadata/technical/jhove"
+    private val jhoveFolder = "$testResourcesPath/$tekstUuid/representations/primary/metadata/technical/jhove"
 
     @Test
     fun `validate JHOVE output file 001 against XSD`() {

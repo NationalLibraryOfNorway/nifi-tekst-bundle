@@ -7,8 +7,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.w3c.dom.Document
-import org.w3c.dom.Element
-import org.w3c.dom.Node
 import org.w3c.dom.NodeList
 import java.io.File
 import java.nio.file.Files
@@ -20,9 +18,9 @@ class CreateMetsBrowsingTest {
     private val projectFolder = Paths.get("").toAbsolutePath().toString()
     private val expectedFile = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS_BROWSING.xml")
     private val objectFolder = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
-    private val altoFolderRelative = "access/metadata/other/ocr"
-    private val imageFolderRelative = "access/data"
-    private val jhoveFolderRelative = "access/metadata/technical/jhove"
+    private val altoFolderRelative = "representations/primary/access/metadata/other/ocr"
+    private val imageFolderRelative = "representations/primary/access/data"
+    private val jhoveFolderRelative = "representations/primary/access/metadata/technical/jhove"
     private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
 
     @BeforeEach
