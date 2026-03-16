@@ -181,6 +181,90 @@ class JhoveTest {
     }
 
     @Test
+    fun testUnsupportedFilesOnlyRoutesToEmpty() {
+        val unsupportedObjectFolder = Files.createTempDirectory("jhove_unsupported_")
+        try {
+            val descriptiveFolder = unsupportedObjectFolder.resolve("metadata/descriptive")
+            val primaryDataFolder = unsupportedObjectFolder.resolve("representations/primary/data")
+            val accessDataFolder = unsupportedObjectFolder.resolve("representations/access/data")
+            val ocrFolder = unsupportedObjectFolder.resolve("representations/access/metadata/other/ocr")
+
+            Files.createDirectories(descriptiveFolder)
+            Files.createDirectories(primaryDataFolder)
+            Files.createDirectories(accessDataFolder)
+            Files.createDirectories(ocrFolder)
+
+            Files.writeString(descriptiveFolder.resolve("note.txt"), "unsupported")
+            Files.writeString(primaryDataFolder.resolve("image.bmp"), "unsupported")
+            Files.writeString(accessDataFolder.resolve("image.webp"), "unsupported")
+            Files.writeString(ocrFolder.resolve("ocr.csv"), "unsupported")
+
+            val runner = TestRunners.newTestRunner(Jhove::class.java)
+            runner.setProperty(Jhove.OBJECT_FOLDER, unsupportedObjectFolder.toString())
+
+            runner.enqueue("test")
+            runner.run()
+
+            runner.assertTransferCount(Jhove.EMPTY_RESULT_RELATIONSHIP, 1)
+            val flowFile = runner.getFlowFilesForRelationship(Jhove.EMPTY_RESULT_RELATIONSHIP).first()
+            assertEquals("0", flowFile.getAttribute("jhove.files_processed"))
+        } finally {
+            unsupportedObjectFolder.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun testDescriptiveFolderInvalidFileParticipatesInFailureRouting() {
+        val descriptiveOnlyObjectFolder = Files.createTempDirectory("jhove_descriptive_only_")
+        try {
+            val descriptiveFolder = descriptiveOnlyObjectFolder.resolve("metadata/descriptive")
+            Files.createDirectories(descriptiveFolder)
+            Files.writeString(descriptiveFolder.resolve("invalid.xml"), "<invalid>")
+
+            val runner = TestRunners.newTestRunner(Jhove::class.java)
+            runner.setProperty(Jhove.OBJECT_FOLDER, descriptiveOnlyObjectFolder.toString())
+
+            runner.enqueue("test")
+            runner.run()
+
+            runner.assertTransferCount(Jhove.FAIL_RELATIONSHIP, 1)
+            val failedFlowFile = runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP).first()
+            val errors = failedFlowFile.getAttribute("jhove.errors")
+            assertNotNull(errors)
+            assertTrue(errors!!.contains("invalid.xml"), "Expected descriptive invalid file to be included in jhove.errors")
+        } finally {
+            descriptiveOnlyObjectFolder.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun testMultipleInvalidFilesAppendErrors() {
+        val errorObjectFolder = Files.createTempDirectory("jhove_multiple_invalid_")
+        try {
+            val descriptiveFolder = errorObjectFolder.resolve("metadata/descriptive")
+            Files.createDirectories(descriptiveFolder)
+            Files.writeString(descriptiveFolder.resolve("invalid_1.xml"), "<invalid>")
+            Files.writeString(descriptiveFolder.resolve("invalid_2.xml"), "<invalid>")
+
+            val runner = TestRunners.newTestRunner(Jhove::class.java)
+            runner.setProperty(Jhove.OBJECT_FOLDER, errorObjectFolder.toString())
+
+            runner.enqueue("test")
+            runner.run()
+
+            runner.assertTransferCount(Jhove.FAIL_RELATIONSHIP, 1)
+            val failedFlowFile = runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP).first()
+            val errors = failedFlowFile.getAttribute("jhove.errors")
+            assertNotNull(errors)
+            assertTrue(errors!!.contains("invalid_1.xml"), "First invalid file should be present in jhove.errors")
+            assertTrue(errors.contains("invalid_2.xml"), "Second invalid file should be present in jhove.errors")
+            assertTrue(errors.contains(";"), "Multiple errors should be appended using ';' delimiter")
+        } finally {
+            errorObjectFolder.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun testFlowFileAttributesContainValidationSummary() {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
