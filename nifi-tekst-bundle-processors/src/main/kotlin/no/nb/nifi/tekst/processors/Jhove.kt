@@ -166,10 +166,6 @@ class Jhove : AbstractProcessor() {
         val errorMessage: String? = null
     )
 
-    private fun appendErrorMessage(existing: String?, additional: String): String {
-        return if (existing.isNullOrBlank()) additional else "$existing | $additional"
-    }
-
     private fun createSecureDocumentBuilderFactory(): DocumentBuilderFactory {
         val factory = DocumentBuilderFactory.newInstance()
         factory.isNamespaceAware = true
@@ -304,7 +300,7 @@ class Jhove : AbstractProcessor() {
             val outputFile = targetFolder.resolve("JHOVE_${inputFile.fileName}.xml")
             val status = runJhoveOnFile(inputFile, outputFile, jhoveModule, configFilePath)
 
-            // Validate JHOVE output against XSD
+			// Validate JHOVE output against XSD
             val jhoveContent = Files.readString(outputFile)
             val validationResult = XsdValidator.validateJhove(jhoveContent)
             if (!validationResult.isValid) {
@@ -314,7 +310,7 @@ class Jhove : AbstractProcessor() {
                     status.copy(
                         isValid = false,
                         isHardFailure = true,
-                        errorMessage = appendErrorMessage(status.errorMessage, xsdError)
+						errorMessage = if (status.errorMessage.isNullOrBlank()) xsdError else "${status.errorMessage} | $xsdError"
                     )
                 )
             } else {
