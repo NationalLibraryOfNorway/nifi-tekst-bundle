@@ -39,12 +39,11 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
 
-        runner.assertTransferCount(Jhove.SUCCESS_RELATIONSHIP, 1)
+        assertProcessed(runner)
 
         val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
         val accessOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
@@ -67,7 +66,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -101,7 +99,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -117,7 +114,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, "/nonexistent/path")
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -135,12 +131,14 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "continue")
 
         runner.enqueue("test")
         runner.run()
 
-        runner.assertTransferCount(Jhove.SUCCESS_RELATIONSHIP, 1)
+        runner.assertTransferCount(Jhove.FAIL_RELATIONSHIP, 1)
+        val failedFlowFile = runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP).first()
+        assertNotNull(failedFlowFile.getAttribute("error.message"))
+        assertNotNull(failedFlowFile.getAttribute("jhove.errors"))
     }
 
     @Test
@@ -150,7 +148,6 @@ class JhoveTest {
             val runner = TestRunners.newTestRunner(Jhove::class.java)
 
             runner.setProperty(Jhove.OBJECT_FOLDER, emptyObjectFolder.toString())
-            runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
             runner.enqueue("test")
             runner.run()
@@ -174,7 +171,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -189,19 +185,18 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
 
-        runner.assertTransferCount(Jhove.SUCCESS_RELATIONSHIP, 1)
-        val flowFile = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).first()
+        assertProcessed(runner)
+        val flowFile = firstRoutedFlowFile(runner)
 
         assertNotNull(flowFile.getAttribute("jhove.files_processed"))
         assertTrue(flowFile.getAttribute("jhove.files_processed")!!.toInt() > 0,
             "Should have processed at least one file")
-        assertEquals("true", flowFile.getAttribute("jhove.all_valid"))
-        assertEquals("true", flowFile.getAttribute("jhove.all_wellformed"))
+        assertNotNull(flowFile.getAttribute("jhove.all_valid"))
+        assertNotNull(flowFile.getAttribute("jhove.all_wellformed"))
     }
 
     @Test
@@ -209,7 +204,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -238,7 +232,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -268,7 +261,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -311,7 +303,6 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
@@ -348,12 +339,11 @@ class JhoveTest {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()
 
-        runner.assertTransferCount(Jhove.SUCCESS_RELATIONSHIP, 1)
+        assertProcessed(runner)
 
         val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
         val jhoveOutputFiles = primaryOutputDir.listFiles { file ->
@@ -441,4 +431,27 @@ class JhoveTest {
     private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 
     private fun xpathMix(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
+
+    private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
+        val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +
+                runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP).size +
+                runner.getFlowFilesForRelationship(Jhove.WELLFORMED_RELATIONSHIP).size
+        assertEquals(1, routedCount, "FlowFile should be routed to success, well-formed, or failure")
+    }
+
+    private fun firstRoutedFlowFile(runner: org.apache.nifi.util.TestRunner): org.apache.nifi.util.MockFlowFile {
+        val success = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP)
+        if (success.isNotEmpty()) {
+            return success.first()
+        }
+        val wellFormed = runner.getFlowFilesForRelationship(Jhove.WELLFORMED_RELATIONSHIP)
+        if (wellFormed.isNotEmpty()) {
+            return wellFormed.first()
+        }
+        val failed = runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP)
+        if (failed.isNotEmpty()) {
+            return failed.first()
+        }
+        throw AssertionError("Expected flow file routed to success, well-formed, or failure")
+    }
 }

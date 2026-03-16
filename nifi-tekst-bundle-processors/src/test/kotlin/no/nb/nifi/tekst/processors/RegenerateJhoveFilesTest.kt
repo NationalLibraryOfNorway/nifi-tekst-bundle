@@ -37,7 +37,6 @@ class RegenerateJhoveFilesTest {
     private fun runJhove(objectFolder: Path) {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
         runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        runner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         runner.enqueue("test")
         runner.run()

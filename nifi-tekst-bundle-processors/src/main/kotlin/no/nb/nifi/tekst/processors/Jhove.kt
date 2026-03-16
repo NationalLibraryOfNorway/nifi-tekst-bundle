@@ -7,11 +7,12 @@ import no.nb.nifi.tekst.validation.XsdValidator
 import org.apache.nifi.annotation.behavior.*
 import org.apache.nifi.annotation.documentation.CapabilityDescription
 import org.apache.nifi.annotation.documentation.Tags
-import org.apache.nifi.components.AllowableValue
 import org.apache.nifi.components.PropertyDescriptor
 import org.apache.nifi.expression.ExpressionLanguageScope
 import org.apache.nifi.processor.*
 import org.apache.nifi.processor.util.StandardValidators
+import org.xml.sax.InputSource
+import java.io.StringReader
 import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -82,28 +83,6 @@ class Jhove : AbstractProcessor() {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build()
 
-        val CONTINUE_ON_ERROR: AllowableValue = AllowableValue(
-            "continue",
-            "Continue on error",
-            "Route XML output to success regardless of JHOVE status"
-        )
-
-        val FAIL_ON_ERROR: AllowableValue = AllowableValue(
-            "fail",
-            "Fail on error",
-            "Route the flowfile to failure if JHOVE reports error"
-        )
-
-        val BEHAVIOUR_ON_ERROR: PropertyDescriptor = PropertyDescriptor.Builder()
-            .name("behaviour_on_error")
-            .displayName("Behaviour on JHOVE error")
-            .description("Defines how the processor behaves if JHOVE reports status other than valid and well-formed")
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .required(true)
-            .allowableValues(CONTINUE_ON_ERROR, FAIL_ON_ERROR)
-            .defaultValue("fail")
-            .build()
-
         val SUCCESS_RELATIONSHIP: Relationship = Relationship.Builder()
             .name("success")
             .description("All JHOVE validations successful (all files well-formed and valid)")
@@ -138,7 +117,6 @@ class Jhove : AbstractProcessor() {
 
     override fun init(context: ProcessorInitializationContext) {
         descriptors.add(OBJECT_FOLDER)
-        descriptors.add(BEHAVIOUR_ON_ERROR)
         descriptors = Collections.unmodifiableList(descriptors)
 
         relationships = HashSet()
@@ -184,8 +162,27 @@ class Jhove : AbstractProcessor() {
         val status: String,
         val isValid: Boolean,
         val isWellFormed: Boolean,
+        val isHardFailure: Boolean = false,
         val errorMessage: String? = null
     )
+
+    private fun appendErrorMessage(existing: String?, additional: String): String {
+        return if (existing.isNullOrBlank()) additional else "$existing | $additional"
+    }
+
+    private fun createSecureDocumentBuilderFactory(): DocumentBuilderFactory {
+        val factory = DocumentBuilderFactory.newInstance()
+        factory.isNamespaceAware = true
+        factory.isExpandEntityReferences = false
+        try {
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        } catch (_: Exception) {
+            // Some XML parsers may not support these features.
+        }
+        return factory
+    }
 
     /**
      * Runs JHOVE validation on a single file and returns the validation status.
@@ -212,10 +209,10 @@ class Jhove : AbstractProcessor() {
             jhoveBase.dispatch(jhoveApp, module, null, handler, outputFile.toString(), arrayOf(inputFile.toString()))
 
             // Parse the generated JHOVE XML output to determine status
-            val domFactory = DocumentBuilderFactory.newInstance()
-            domFactory.isNamespaceAware = true
+            val domFactory = createSecureDocumentBuilderFactory()
             val builder = domFactory.newDocumentBuilder()
-            val doc = builder.parse(outputFile.toString())
+            builder.setEntityResolver { _, _ -> InputSource(StringReader("")) }
+			val doc = builder.parse(outputFile.toString())
             val factory = XPathFactory.newInstance()
             val xpath = factory.newXPath()
             xpath.namespaceContext = object : NamespaceContext {
@@ -237,10 +234,13 @@ class Jhove : AbstractProcessor() {
 
             val isValid = status == WELL_FORMED_AND_VALID
             val isWellFormed = status.contains("Well-Formed")
+            val isHardFailure = !isWellFormed
 
             val errorMsg = if (!isValid) {
                 val msgExpr = xpath.compile("/jhove:jhove/jhove:repInfo/jhove:messages/jhove:message")
-                msgExpr.evaluate(doc) as String
+                val jhoveMsg = msgExpr.evaluate(doc) as String
+                val details = if (jhoveMsg.isBlank()) "No detailed message from JHOVE" else jhoveMsg
+                "${inputFile.fileName}: $status ($details)"
             } else {
                 null
             }
@@ -250,6 +250,7 @@ class Jhove : AbstractProcessor() {
                 status = status,
                 isValid = isValid,
                 isWellFormed = isWellFormed,
+                isHardFailure = isHardFailure,
                 errorMessage = errorMsg
             )
 
@@ -307,8 +308,15 @@ class Jhove : AbstractProcessor() {
             val jhoveContent = Files.readString(outputFile)
             val validationResult = XsdValidator.validateJhove(jhoveContent)
             if (!validationResult.isValid) {
+                val xsdError = "${inputFile.fileName}: XSD validation failed: ${validationResult.getErrorMessage()}"
                 logger("JHOVE output failed XSD validation for ${inputFile.fileName}: ${validationResult.getErrorMessage()}")
-                results.add(status.copy(errorMessage = "XSD validation failed: ${validationResult.getErrorMessage()}"))
+                results.add(
+                    status.copy(
+                        isValid = false,
+                        isHardFailure = true,
+                        errorMessage = appendErrorMessage(status.errorMessage, xsdError)
+                    )
+                )
             } else {
                 results.add(status)
                 logger("JHOVE validation successful for ${inputFile.fileName}: ${status.status}")
@@ -324,7 +332,6 @@ class Jhove : AbstractProcessor() {
         try {
             val objectFolderPath = context.getProperty(OBJECT_FOLDER)
                 .evaluateAttributeExpressions(flowFile).value
-            val errorMode = context.getProperty(BEHAVIOUR_ON_ERROR).value
 
             if (objectFolderPath.isNullOrBlank()) {
                 throw RoutedException(
@@ -367,9 +374,12 @@ class Jhove : AbstractProcessor() {
 
             val allValid = allValidationResults.all { it.isValid }
             val allWellFormed = allValidationResults.all { it.isWellFormed }
+            val hasHardFailures = allValidationResults.any { it.isHardFailure }
             val errorList = allValidationResults
                 .filter { !it.isValid }
-                .mapNotNull { it.errorMessage }
+                .map { status ->
+                    status.errorMessage ?: "${status.filePath.fileName}: ${status.status}"
+                }
 
             val validationSummary = ValidationResult(
                 allValid = allValid,
@@ -393,11 +403,7 @@ class Jhove : AbstractProcessor() {
                     getLogger().info("All JHOVE validations successful - routing to success")
                     session.transfer(flowFile, SUCCESS_RELATIONSHIP)
                 }
-                validationSummary.allWellFormed -> {
-                    getLogger().info("All files are well-formed but some are not valid - routing to well-formed")
-                    session.transfer(flowFile, WELLFORMED_RELATIONSHIP)
-                }
-                errorMode == "fail" -> {
+                hasHardFailures -> {
                     throw RoutedException(
                         FAIL_RELATIONSHIP,
                         false,
@@ -405,9 +411,17 @@ class Jhove : AbstractProcessor() {
                         null
                     )
                 }
+                validationSummary.allWellFormed -> {
+                    getLogger().info("All files are well-formed but some are not valid - routing to well-formed")
+                    session.transfer(flowFile, WELLFORMED_RELATIONSHIP)
+                }
                 else -> {
-                    getLogger().info("JHOVE validation failed but error mode is continue - routing to success")
-                    session.transfer(flowFile, SUCCESS_RELATIONSHIP)
+                    throw RoutedException(
+                        FAIL_RELATIONSHIP,
+                        false,
+                        "JHOVE validation failed: ${validationSummary.errors.joinToString("; ")}",
+                        null
+                    )
                 }
             }
 

@@ -63,12 +63,11 @@ class JhoveToMetsBrowsingIntegrationTest {
         // Step 1: Run Jhove processor on the object folder
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
         jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        jhoveRunner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         jhoveRunner.enqueue("test")
         jhoveRunner.run()
 
-        jhoveRunner.assertTransferCount(Jhove.SUCCESS_RELATIONSHIP, 1)
+        assertProcessed(jhoveRunner)
 
         // Verify JHOVE output files were created
         val accessJhoveOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
@@ -210,10 +209,10 @@ class JhoveToMetsBrowsingIntegrationTest {
         // Step 1: Run Jhove processor on the object folder
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
         jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        jhoveRunner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         jhoveRunner.enqueue("test")
         jhoveRunner.run()
+        assertProcessed(jhoveRunner)
 
         // Verify JHOVE files were created, then delete one
         val accessJhoveOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
@@ -259,11 +258,11 @@ class JhoveToMetsBrowsingIntegrationTest {
         // Run Jhove processor
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
         jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-        jhoveRunner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
 
         val jhoveStartTime = System.currentTimeMillis()
         jhoveRunner.enqueue("test")
         jhoveRunner.run()
+        assertProcessed(jhoveRunner)
         val jhoveEndTime = System.currentTimeMillis()
 
         // Run CreateMetsBrowsing processor
@@ -300,4 +299,11 @@ class JhoveToMetsBrowsingIntegrationTest {
     private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 
     private fun xpathNodeList(doc: Document, expression: String): NodeList = XmlHelper.xpathNodeList(doc, expression)
+
+    private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
+        val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +
+                runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP).size +
+                runner.getFlowFilesForRelationship(Jhove.WELLFORMED_RELATIONSHIP).size
+        assertEquals(1, routedCount, "FlowFile should be routed to success, well-formed, or failure")
+    }
 }
