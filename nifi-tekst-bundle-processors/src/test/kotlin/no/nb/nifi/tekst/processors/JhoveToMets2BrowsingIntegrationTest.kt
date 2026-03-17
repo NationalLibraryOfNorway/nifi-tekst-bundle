@@ -421,6 +421,11 @@ class JhoveToMets2BrowsingIntegrationTest {
     @Test
     fun testMets2Mix2IntegrationPerformanceMetrics() {
         val startTime = System.currentTimeMillis()
+        val timingSteps = mutableListOf<Pair<String, Long>>()
+
+        val diagnosticsStartTime = System.currentTimeMillis()
+        printDescriptiveXmlDiagnostics()
+        timingSteps.add("[TIMING] Descriptive XML diagnostics" to (System.currentTimeMillis() - diagnosticsStartTime))
 
         // Run Jhove processor
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
@@ -430,6 +435,7 @@ class JhoveToMets2BrowsingIntegrationTest {
         jhoveRunner.enqueue("test")
         jhoveRunner.run()
         val jhoveEndTime = System.currentTimeMillis()
+        timingSteps.add("[TIMING] Jhove processing" to (jhoveEndTime - jhoveStartTime))
 
         assertProcessed(jhoveRunner)
 
@@ -445,6 +451,7 @@ class JhoveToMets2BrowsingIntegrationTest {
             assertTrue(result.isValid, "JHOVE file ${jhoveFile.name} should be valid")
         }
         val xsdValidationEndTime = System.currentTimeMillis()
+        timingSteps.add("[TIMING] JHOVE XSD validation" to (xsdValidationEndTime - xsdValidationStartTime))
 
         // Run CreateMetsBrowsing processor with METS2 + MIX2
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
@@ -461,6 +468,7 @@ class JhoveToMets2BrowsingIntegrationTest {
         metsRunner.enqueue("test")
         metsRunner.run()
         val metsEndTime = System.currentTimeMillis()
+        timingSteps.add("[TIMING] METS2 generation" to (metsEndTime - metsStartTime))
 
         // Validate generated METS2 against XSD
         val mets2ValidationStartTime = System.currentTimeMillis()
@@ -468,22 +476,23 @@ class JhoveToMets2BrowsingIntegrationTest {
         val mets2ValidationResult = XsdValidator.validateMets2(mets2Content)
         assertTrue(mets2ValidationResult.isValid, "Generated METS2 should be valid against XSD")
         val mets2ValidationEndTime = System.currentTimeMillis()
+        timingSteps.add("[TIMING] METS2 XSD validation" to (mets2ValidationEndTime - mets2ValidationStartTime))
 
         // Validate embedded MIX2 data against XSD
         val mix2ValidationStartTime = System.currentTimeMillis()
         val mix2ValidationResult = XsdValidator.validateMix2InMets(mets2Content)
         assertTrue(mix2ValidationResult.isValid, "Embedded MIX2 should be valid against XSD")
         val mix2ValidationEndTime = System.currentTimeMillis()
+        timingSteps.add("[TIMING] MIX2 XSD validation" to (mix2ValidationEndTime - mix2ValidationStartTime))
 
         val totalTime = System.currentTimeMillis() - startTime
+        timingSteps.add("[TIMING] Total workflow" to totalTime)
 
         println("=== METS2 + MIX2 Integration Test Performance Metrics ===")
-        println("Jhove processing time: ${jhoveEndTime - jhoveStartTime}ms")
-        println("JHOVE XSD validation time: ${xsdValidationEndTime - xsdValidationStartTime}ms for ${jhoveOutputFiles.size} files")
-        println("METS2 generation time: ${metsEndTime - metsStartTime}ms")
-        println("METS2 XSD validation time: ${mets2ValidationEndTime - mets2ValidationStartTime}ms")
-        println("MIX2 XSD validation time: ${mix2ValidationEndTime - mix2ValidationStartTime}ms")
-        println("Total workflow time: ${totalTime}ms")
+        println("[TIMING] JHOVE XSD validation files: ${jhoveOutputFiles.size}")
+        timingSteps.sortedByDescending { it.second }.forEach { (name, elapsedMs) ->
+            println("$name: ${elapsedMs}ms")
+        }
 
         // Basic assertion that the workflow completes in reasonable time
         assertTrue(totalTime < 120000, "Total workflow should complete in under 2 minutes")
@@ -528,6 +537,32 @@ class JhoveToMets2BrowsingIntegrationTest {
     private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 
     private fun xpathNodeList(doc: Document, expression: String): NodeList = XmlHelper.xpathNodeList(doc, expression)
+
+    private fun printDescriptiveXmlDiagnostics() {
+        val descriptiveDir = objectFolder.resolve("metadata/descriptive").toFile()
+        val descriptiveFiles = descriptiveDir.listFiles { file ->
+            file.isFile && file.name.endsWith(".xml", ignoreCase = true)
+        }?.sortedBy { it.name } ?: emptyList()
+
+        println("[TIMING] descriptive XML files: ${descriptiveFiles.size}")
+        for (file in descriptiveFiles) {
+            val schemaUrls = extractSchemaUrls(file)
+            println("[TIMING] ${file.name} schema URLs (${schemaUrls.size}): ${schemaUrls.joinToString(", ")}")
+        }
+    }
+
+    private fun extractSchemaUrls(file: File): List<String> {
+        val content = file.readText()
+        val schemaLocationPattern = Regex("""xsi:schemaLocation\s*=\s*"([^"]+)"""")
+        val urls = mutableListOf<String>()
+        schemaLocationPattern.findAll(content).forEach { match ->
+            val tokens = match.groupValues[1].trim().split(Regex("""\s+""")).filter { it.isNotBlank() }
+            for (index in 1 until tokens.size step 2) {
+                urls.add(tokens[index])
+            }
+        }
+        return urls.distinct()
+    }
 
     private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
         val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +

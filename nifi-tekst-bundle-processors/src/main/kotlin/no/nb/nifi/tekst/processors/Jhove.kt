@@ -173,6 +173,7 @@ class Jhove : AbstractProcessor() {
         moduleName: String,
         configPath: String
     ): FileValidationStatus {
+        val startTime = System.currentTimeMillis()
         getLogger().info("Starting Jhove on file $inputFile with module $moduleName")
 
         try {
@@ -223,6 +224,12 @@ class Jhove : AbstractProcessor() {
                 null
             }
 
+            val elapsedMs = System.currentTimeMillis() - startTime
+            getLogger().info(
+                "Completed Jhove on file $inputFile -> $outputFile in ${elapsedMs}ms " +
+                        "(module=$moduleName, status=$status)"
+            )
+
             return FileValidationStatus(
                 filePath = inputFile,
                 status = status,
@@ -232,6 +239,11 @@ class Jhove : AbstractProcessor() {
             )
 
         } catch (e: Exception) {
+            val elapsedMs = System.currentTimeMillis() - startTime
+            getLogger().error(
+                "Jhove failed for file $inputFile after ${elapsedMs}ms (module=$moduleName): ${e.message}",
+                e
+            )
             throw RoutedException(FAIL_RELATIONSHIP, false, "Exception while running Jhove on $inputFile - " + e.message, e)
         }
     }
@@ -247,7 +259,9 @@ class Jhove : AbstractProcessor() {
         targetFolder: Path,
         logger: (String) -> Unit
     ): List<FileValidationStatus> {
+        val folderStartTime = System.currentTimeMillis()
         val results = mutableListOf<FileValidationStatus>()
+        var skippedFiles = 0
 
         if (!Files.exists(sourceFolder) || !Files.isDirectory(sourceFolder)) {
             logger("Source folder does not exist or is not a directory: $sourceFolder")
@@ -270,11 +284,15 @@ class Jhove : AbstractProcessor() {
         val filesToProcess = Files.list(sourceFolder).use { stream ->
             stream.filter { Files.isRegularFile(it) }.toList()
         }
+        logger(
+            "Starting JHOVE folder validation: source=$sourceFolder, target=$targetFolder, filesConsidered=${filesToProcess.size}"
+        )
 
         for (inputFile in filesToProcess) {
             val jhoveModule = detectJhoveModule(inputFile)
             if (jhoveModule == null) {
                 logger("Skipping file ${inputFile.fileName} - unsupported file type")
+                skippedFiles++
                 continue
             }
 
@@ -297,6 +315,12 @@ class Jhove : AbstractProcessor() {
                 logger("JHOVE validation successful for ${inputFile.fileName}: ${status.status}")
             }
         }
+
+        val elapsedMs = System.currentTimeMillis() - folderStartTime
+        logger(
+            "Completed JHOVE folder validation: source=$sourceFolder, target=$targetFolder, " +
+                    "processed=${results.size}, skipped=$skippedFiles, elapsed=${elapsedMs}ms"
+        )
 
         return results
     }

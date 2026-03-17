@@ -254,6 +254,11 @@ class JhoveToMetsBrowsingIntegrationTest {
     @Test
     fun testIntegrationPerformanceMetrics() {
         val startTime = System.currentTimeMillis()
+        val timingSteps = mutableListOf<Pair<String, Long>>()
+
+        val diagnosticsStartTime = System.currentTimeMillis()
+        printDescriptiveXmlDiagnostics()
+        timingSteps.add("[TIMING] Descriptive XML diagnostics" to (System.currentTimeMillis() - diagnosticsStartTime))
 
         // Run Jhove processor
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
@@ -264,6 +269,7 @@ class JhoveToMetsBrowsingIntegrationTest {
         jhoveRunner.run()
         assertProcessed(jhoveRunner)
         val jhoveEndTime = System.currentTimeMillis()
+        timingSteps.add("[TIMING] Jhove processing" to (jhoveEndTime - jhoveStartTime))
 
         // Run CreateMetsBrowsing processor
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
@@ -280,13 +286,15 @@ class JhoveToMetsBrowsingIntegrationTest {
         metsRunner.enqueue("test")
         metsRunner.run()
         val metsEndTime = System.currentTimeMillis()
+        timingSteps.add("[TIMING] METS generation" to (metsEndTime - metsStartTime))
 
         val totalTime = System.currentTimeMillis() - startTime
+        timingSteps.add("[TIMING] Total workflow" to totalTime)
 
         println("=== Integration Test Performance Metrics ===")
-        println("Jhove processing time: ${jhoveEndTime - jhoveStartTime}ms")
-        println("METS generation time: ${metsEndTime - metsStartTime}ms")
-        println("Total workflow time: ${totalTime}ms")
+        timingSteps.sortedByDescending { it.second }.forEach { (name, elapsedMs) ->
+            println("$name: ${elapsedMs}ms")
+        }
 
         // Basic assertion that the workflow completes in reasonable time
         assertTrue(totalTime < 120000, "Total workflow should complete in under 2 minutes")
@@ -299,6 +307,32 @@ class JhoveToMetsBrowsingIntegrationTest {
     private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 
     private fun xpathNodeList(doc: Document, expression: String): NodeList = XmlHelper.xpathNodeList(doc, expression)
+
+    private fun printDescriptiveXmlDiagnostics() {
+        val descriptiveDir = objectFolder.resolve("metadata/descriptive").toFile()
+        val descriptiveFiles = descriptiveDir.listFiles { file ->
+            file.isFile && file.name.endsWith(".xml", ignoreCase = true)
+        }?.sortedBy { it.name } ?: emptyList()
+
+        println("[TIMING] descriptive XML files: ${descriptiveFiles.size}")
+        for (file in descriptiveFiles) {
+            val schemaUrls = extractSchemaUrls(file)
+            println("[TIMING] ${file.name} schema URLs (${schemaUrls.size}): ${schemaUrls.joinToString(", ")}")
+        }
+    }
+
+    private fun extractSchemaUrls(file: File): List<String> {
+        val content = file.readText()
+        val schemaLocationPattern = Regex("""xsi:schemaLocation\s*=\s*"([^"]+)"""")
+        val urls = mutableListOf<String>()
+        schemaLocationPattern.findAll(content).forEach { match ->
+            val tokens = match.groupValues[1].trim().split(Regex("""\s+""")).filter { it.isNotBlank() }
+            for (index in 1 until tokens.size step 2) {
+                urls.add(tokens[index])
+            }
+        }
+        return urls.distinct()
+    }
 
     private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
         val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +
