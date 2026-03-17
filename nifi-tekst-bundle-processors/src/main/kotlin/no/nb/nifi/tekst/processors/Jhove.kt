@@ -354,11 +354,14 @@ class Jhove : AbstractProcessor() {
                 val sourcePath = objectFolder.resolve(sourceSubfolder)
                 val targetPath = objectFolder.resolve(targetSubfolder)
 
+                val folderStart = System.currentTimeMillis()
                 val results = validateFolderContents(
                     sourcePath,
                     targetPath,
                     { msg -> getLogger().info(msg) }
                 )
+                val folderElapsed = System.currentTimeMillis() - folderStart
+                getLogger().info("JHOVE folder $sourceSubfolder -> $targetSubfolder took ${folderElapsed}ms")
 
                 allValidationResults.addAll(results)
             }
