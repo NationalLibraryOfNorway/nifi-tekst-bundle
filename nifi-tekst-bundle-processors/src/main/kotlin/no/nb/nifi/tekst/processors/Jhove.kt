@@ -50,6 +50,8 @@ class Jhove : AbstractProcessor() {
         private const val WELL_FORMED_AND_VALID = "Well-Formed and valid"
 
         private const val JHOVE_CONFIG_RESOURCE = "/jhoveconf.xml"
+        private const val ALTO_XSD_RESOURCE = "/xsd/alto-1-2.xsd"
+        private const val ALTO_SCHEMA_URL = "http://schema.ccs-gmbh.com/metae/alto-1-2.xsd"
 
         // Hardcoded subfolder mappings: each key is a source subfolder, value is the target output subfolder for JHOVE XML files
         private val FOLDER_MAPPINGS = mapOf(
@@ -127,11 +129,26 @@ class Jhove : AbstractProcessor() {
         // Load config from classpath resource and copy to temp file once
         val configStream = javaClass.getResourceAsStream(JHOVE_CONFIG_RESOURCE)
             ?: throw IllegalStateException("Could not load JHOVE config from classpath")
+
+        // Extract ALTO XSD to a temp file so JHOVE's XML module can resolve it locally
+        val altoXsdStream = javaClass.getResourceAsStream(ALTO_XSD_RESOURCE)
+            ?: throw IllegalStateException("Could not load ALTO XSD from classpath: $ALTO_XSD_RESOURCE")
+        val tempAltoXsdFile = Files.createTempFile("alto-schema-", ".xsd")
+        tempAltoXsdFile.toFile().deleteOnExit()
+        altoXsdStream.use { inputStream ->
+            Files.copy(inputStream, tempAltoXsdFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+
+        // Update jhoveconf.xml to map the ALTO schema URL to the local temp file
+        val configContent = configStream.bufferedReader().readText()
+        val updatedConfig = configContent.replace(
+            "<param>schema=http://www.example.com/schema;/home/schemas/exampleschema.xsd</param>",
+            "<param>schema=$ALTO_SCHEMA_URL;${tempAltoXsdFile.toAbsolutePath()}</param>"
+        )
+
         val tempConfigFile = Files.createTempFile("jhove-config", ".xml")
         tempConfigFile.toFile().deleteOnExit()
-        configStream.use { inputStream ->
-            Files.copy(inputStream, tempConfigFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        }
+        Files.writeString(tempConfigFile, updatedConfig)
         configFilePath = tempConfigFile.toString()
     }
 
