@@ -65,7 +65,7 @@ object TestObjectFolderHelper {
                     Files.createDirectories(destination)
                 } else {
                     Files.createDirectories(destination.parent)
-                    Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING)
+                    Files.createSymbolicLink(destination, path.toAbsolutePath())
                 }
             }
         }

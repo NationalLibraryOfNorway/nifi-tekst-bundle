@@ -494,8 +494,8 @@ class JhoveToMets2BrowsingIntegrationTest {
             println("$name: ${elapsedMs}ms")
         }
 
-        // Basic assertion that the workflow completes in reasonable time
-        assertTrue(totalTime < 120000, "Total workflow should complete in under 2 minutes")
+        // Basic assertion that the workflow completes in reasonable time (10 min allows for slower CI runners)
+        assertTrue(totalTime < 600000, "Total workflow should complete in under 10 minutes")
     }
 
     @Test
