@@ -9,14 +9,18 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.nio.file.Path
+import org.apache.nifi.util.TestRunner
+import org.apache.nifi.util.TestRunners
+import org.junit.jupiter.api.BeforeEach
+import java.nio.file.Files
 
 class ReorderFilesTest {
     private val reorderFiles = ReorderFiles()
     private val mapper = ObjectMapper()
-    val baseDir: Path = createTempDir().toPath().normalize()
-    
-    val flowFile = readFile("flowfile.json")
-    val changes= flowFile["changes"]
+    private lateinit var runner: TestRunner
+    private lateinit var flowFile: JsonNode
+    private lateinit var changes: JsonNode
+    val baseDir: Path = Files.createTempDirectory("reorder-files-test").normalize()
 
     private fun stripPath(entries: List<Map<String, String>>): List<Map<String, String>> =
         entries.map { entry -> entry.mapValues { (_, v) -> v.substringAfterLast('/') } }
@@ -28,9 +32,27 @@ class ReorderFilesTest {
         return mapper.readTree(jsonContent)
     }
 
+    @BeforeEach
+    fun setUp() {
+        flowFile = readFile("flowfile.json")
+        changes = flowFile["changes"]
+        runner = TestRunners.newTestRunner(ReorderFiles())
+        runner.setProperty(ReorderFiles.BASE_DIR, baseDir.toString())
+        runner.assertValid()
+    }
+
     @AfterEach
     fun tearDown() {
         baseDir.toFile().deleteRecursively()
+    }
+
+    @Test
+    fun `processor runs and produces expected output`() {
+        // Prepare input FlowFile content (JSON)
+        val inputJson = Files.readString(Path.of("src/test/resources/reorder-files/flowfile.json"))
+        runner.enqueue(inputJson.toByteArray())
+        runner.run()
+        runner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
     }
 
     @Test
