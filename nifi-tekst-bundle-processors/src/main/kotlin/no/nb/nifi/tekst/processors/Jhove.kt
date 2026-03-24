@@ -53,6 +53,15 @@ class Jhove : AbstractProcessor() {
         private const val ALTO_XSD_RESOURCE = "/xsd/alto-1-2.xsd"
         private const val ALTO_SCHEMA_URL = "http://schema.ccs-gmbh.com/metae/alto-1-2.xsd"
 
+        private const val METS_XSD_RESOURCE = "/xsd/mets.xsd"
+        private const val METS_SCHEMA_URL = "http://www.loc.gov/standards/mets/mets.xsd"
+
+        private const val MIX10_XSD_RESOURCE = "/xsd/mix10.xsd"
+        private const val MIX10_SCHEMA_URL = "http://www.loc.gov/standards/mix/mix10/mix10.xsd"
+
+        private const val XLINK_XSD_RESOURCE = "/xsd/xlink.xsd"
+        private const val XLINK_SCHEMA_URL = "http://www.loc.gov/standards/xlink/xlink.xsd"
+
         // Hardcoded subfolder mappings: each key is a source subfolder, value is the target output subfolder for JHOVE XML files
         private val FOLDER_MAPPINGS = mapOf(
 			"metadata/descriptive" to "metadata/other/jhove",
@@ -130,20 +139,36 @@ class Jhove : AbstractProcessor() {
         val configStream = javaClass.getResourceAsStream(JHOVE_CONFIG_RESOURCE)
             ?: throw IllegalStateException("Could not load JHOVE config from classpath")
 
-        // Extract ALTO XSD to a temp file so JHOVE's XML module can resolve it locally
-        val altoXsdStream = javaClass.getResourceAsStream(ALTO_XSD_RESOURCE)
-            ?: throw IllegalStateException("Could not load ALTO XSD from classpath: $ALTO_XSD_RESOURCE")
-        val tempAltoXsdFile = Files.createTempFile("alto-schema-", ".xsd")
-        tempAltoXsdFile.toFile().deleteOnExit()
-        altoXsdStream.use { inputStream ->
-            Files.copy(inputStream, tempAltoXsdFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        // Extract all XSD resources to temp files so JHOVE's XML module resolves them locally
+        fun extractXsd(resource: String): java.nio.file.Path {
+            val stream = javaClass.getResourceAsStream(resource)
+                ?: throw IllegalStateException("Could not load XSD from classpath: $resource")
+            val tmp = Files.createTempFile("schema-", ".xsd")
+            tmp.toFile().deleteOnExit()
+            stream.use { Files.copy(it, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+            return tmp
         }
 
-        // Update jhoveconf.xml to map the ALTO schema URL to the local temp file
+        val tempAltoXsdFile  = extractXsd(ALTO_XSD_RESOURCE)
+        val tempMetsXsdFile  = extractXsd(METS_XSD_RESOURCE)
+        val tempMix10XsdFile = extractXsd(MIX10_XSD_RESOURCE)
+        val tempXlinkXsdFile = extractXsd(XLINK_XSD_RESOURCE)
+
+        // Build all <param> lines for schema mappings
+        val schemaParams = listOf(
+            ALTO_SCHEMA_URL  to tempAltoXsdFile,
+            METS_SCHEMA_URL  to tempMetsXsdFile,
+            MIX10_SCHEMA_URL to tempMix10XsdFile,
+            XLINK_SCHEMA_URL to tempXlinkXsdFile
+        ).joinToString("\n") { (url, path) ->
+            "    <param>schema=$url;${path.toAbsolutePath()}</param>"
+        }
+
+        // Update jhoveconf.xml: replace the single placeholder param with all schema mappings
         val configContent = configStream.bufferedReader().readText()
         val updatedConfig = configContent.replace(
             "<param>schema=http://www.example.com/schema;/home/schemas/exampleschema.xsd</param>",
-            "<param>schema=$ALTO_SCHEMA_URL;${tempAltoXsdFile.toAbsolutePath()}</param>"
+            schemaParams
         )
 
         val tempConfigFile = Files.createTempFile("jhove-config", ".xml")
