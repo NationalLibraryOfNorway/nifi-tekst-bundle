@@ -99,6 +99,10 @@
                 <version>3.2.5</version>
                 <configuration>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
+                    <argLine>
+                        -Djavax.xml.accessExternalDTD=file,jar
+                        -Djavax.xml.accessExternalSchema=file,jar
+                    </argLine>
                 </configuration>
             </plugin>
         </plugins>
