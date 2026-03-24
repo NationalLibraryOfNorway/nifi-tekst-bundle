@@ -18,9 +18,9 @@ class CreateMetsBrowsingTest {
     private val projectFolder = Paths.get("").toAbsolutePath().toString()
     private val expectedFile = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS_BROWSING.xml")
     private val objectFolder = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
-    private val altoFolderRelative = "representations/primary/access/metadata/other/ocr"
-    private val imageFolderRelative = "representations/primary/access/data"
-    private val jhoveFolderRelative = "representations/primary/access/metadata/technical/jhove"
+    private val altoFolderRelative = "representations/access/metadata/other/ocr"
+    private val imageFolderRelative = "representations/access/data"
+    private val jhoveFolderRelative = "representations/access/metadata/technical/jhove"
     private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
 
     @BeforeEach
