@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog">
+    <!-- JHOVE config schema (fetched by JhoveBase.init() on every file) -->
+    <system systemId="http://hul.harvard.edu/ois/xml/xsd/jhove/1.26/jhoveConfig.xsd"
+            uri="xsd/jhoveConfig-schema.xsd"/>
+
+    <!-- METS / MIX / XLink schemas (fetched by JHOVE XML-hul module + XsdValidator) -->
+    <system systemId="http://www.loc.gov/standards/mets/mets.xsd"
+            uri="xsd/mets.xsd"/>
+    <system systemId="http://www.loc.gov/standards/mix/mix10/mix10.xsd"
+            uri="xsd/mix10.xsd"/>
+    <system systemId="http://www.loc.gov/standards/xlink/xlink.xsd"
+            uri="xsd/xlink.xsd"/>
+
+    <!-- ALTO schema -->
+    <system systemId="http://schema.ccs-gmbh.com/metae/alto-1-2.xsd"
+            uri="xsd/alto-1-2.xsd"/>
+</catalog>
+
