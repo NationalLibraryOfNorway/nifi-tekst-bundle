@@ -24,9 +24,4 @@ nifi-docker/output/*
 nifi-docker/conf/*
 !nifi-docker/conf/flow.json.gz
 !nifi-docker/conf/nifi.properties
-nifi-docker/content_repository/
-nifi-docker/database_repository/
-nifi-docker/flowfile_repository/
-nifi-docker/provenance_repository/
-nifi-docker/state/
 .aider*
