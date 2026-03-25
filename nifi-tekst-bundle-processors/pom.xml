@@ -99,12 +99,6 @@
                 <version>3.2.5</version>
                 <configuration>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                    <argLine>
-                        -Djavax.xml.catalog.files=file:${project.build.outputDirectory}/xml-schema-resolver.xml
-                        -Djavax.xml.catalog.resolve=continue
-                        -Djavax.xml.accessExternalDTD=file,jar
-                        -Djavax.xml.accessExternalSchema=file,jar
-                    </argLine>
                 </configuration>
             </plugin>
         </plugins>

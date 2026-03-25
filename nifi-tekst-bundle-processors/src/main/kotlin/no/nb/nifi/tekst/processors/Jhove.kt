@@ -180,7 +180,11 @@ class Jhove : AbstractProcessor() {
         check(configContent.contains(placeholder)) {
             "jhoveconf.xml does not contain the expected schema placeholder – local schema mappings cannot be injected"
         }
-        val updatedConfig = configContent.replace(placeholder, schemaParams)
+        val updatedConfig = configContent
+            .replace(placeholder, schemaParams)
+            // Strip xsi:schemaLocation to prevent JhoveBase.init() from fetching the
+            // config schema over the network (times out on offline CI runners)
+            .replace(Regex("""\s+xsi:schemaLocation="[^"]*""""), "")
 
         val tempConfigFile = Files.createTempFile("jhove-config", ".xml")
         tempConfigFile.toFile().deleteOnExit()
