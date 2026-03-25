@@ -164,14 +164,25 @@ class Jhove : AbstractProcessor() {
         val tempMix20XsdFile = extractXsd(MIX20_XSD_RESOURCE)
         val tempXlinkXsdFile = extractXsd(XLINK_XSD_RESOURCE)
 
-        // Map schema URLs to local temp files for direct injection into XmlModule
+        // Map schema URLs AND namespace URIs to local temp files for direct injection into XmlModule.
+        // Xerces resolves both xsi:schemaLocation URLs and namespace URIs via the entity resolver.
         localSchemaMap = mapOf(
+            // Schema location URLs (from xsi:schemaLocation in XML files)
             ALTO_SCHEMA_URL  to tempAltoXsdFile.toFile(),
             METS_SCHEMA_URL  to tempMetsXsdFile.toFile(),
             METS2_SCHEMA_URL to tempMets2XsdFile.toFile(),
             MIX10_SCHEMA_URL to tempMix10XsdFile.toFile(),
             MIX20_SCHEMA_URL to tempMix20XsdFile.toFile(),
-            XLINK_SCHEMA_URL to tempXlinkXsdFile.toFile()
+            XLINK_SCHEMA_URL to tempXlinkXsdFile.toFile(),
+            // Schema URL imported by alto-1-2.xsd (different xlink variant)
+            "http://schema.ccs-gmbh.com/METAe/xlink.xsd" to tempXlinkXsdFile.toFile(),
+            // Namespace URIs (Xerces tries these as fallback schema locations)
+            "http://www.loc.gov/METS/"       to tempMetsXsdFile.toFile(),
+            "http://www.loc.gov/METS/v2"     to tempMets2XsdFile.toFile(),
+            "http://www.loc.gov/mix/v10"     to tempMix10XsdFile.toFile(),
+            "http://www.loc.gov/mix/v20"     to tempMix20XsdFile.toFile(),
+            "http://www.w3.org/1999/xlink"   to tempXlinkXsdFile.toFile(),
+            "http://www.w3.org/TR/xlink"     to tempXlinkXsdFile.toFile()
         )
 
         // Build all <param> lines for schema mappings (fallback if config parsing works)
@@ -181,7 +192,8 @@ class Jhove : AbstractProcessor() {
             METS2_SCHEMA_URL to tempMets2XsdFile,
             MIX10_SCHEMA_URL to tempMix10XsdFile,
             MIX20_SCHEMA_URL to tempMix20XsdFile,
-            XLINK_SCHEMA_URL to tempXlinkXsdFile
+            XLINK_SCHEMA_URL to tempXlinkXsdFile,
+            "http://schema.ccs-gmbh.com/METAe/xlink.xsd" to tempXlinkXsdFile
         ).joinToString("\n") { (url, path) ->
             "    <param>schema=$url;${path.toAbsolutePath()}</param>"
         }
