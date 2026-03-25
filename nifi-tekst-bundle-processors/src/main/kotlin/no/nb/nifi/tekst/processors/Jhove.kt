@@ -11,6 +11,7 @@ import org.apache.nifi.components.PropertyDescriptor
 import org.apache.nifi.expression.ExpressionLanguageScope
 import org.apache.nifi.processor.*
 import org.apache.nifi.processor.util.StandardValidators
+import java.io.File
 import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -32,6 +33,7 @@ class Jhove : AbstractProcessor() {
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
     private var relationships: MutableSet<Relationship> = mutableSetOf()
     private lateinit var configFilePath: String
+    private lateinit var localSchemaMap: Map<String, File>
 
     companion object {
         /** Application name.  */
@@ -162,7 +164,17 @@ class Jhove : AbstractProcessor() {
         val tempMix20XsdFile = extractXsd(MIX20_XSD_RESOURCE)
         val tempXlinkXsdFile = extractXsd(XLINK_XSD_RESOURCE)
 
-        // Build all <param> lines for schema mappings
+        // Map schema URLs to local temp files for direct injection into XmlModule
+        localSchemaMap = mapOf(
+            ALTO_SCHEMA_URL  to tempAltoXsdFile.toFile(),
+            METS_SCHEMA_URL  to tempMetsXsdFile.toFile(),
+            METS2_SCHEMA_URL to tempMets2XsdFile.toFile(),
+            MIX10_SCHEMA_URL to tempMix10XsdFile.toFile(),
+            MIX20_SCHEMA_URL to tempMix20XsdFile.toFile(),
+            XLINK_SCHEMA_URL to tempXlinkXsdFile.toFile()
+        )
+
+        // Build all <param> lines for schema mappings (fallback if config parsing works)
         val schemaParams = listOf(
             ALTO_SCHEMA_URL  to tempAltoXsdFile,
             METS_SCHEMA_URL  to tempMetsXsdFile,
@@ -182,8 +194,9 @@ class Jhove : AbstractProcessor() {
         }
         val updatedConfig = configContent
             .replace(placeholder, schemaParams)
-            // Strip xsi:schemaLocation to prevent JhoveBase.init() from fetching the
-            // config schema over the network (times out on offline CI runners)
+            // Strip xsi namespace and schemaLocation to prevent JhoveBase.init() from
+            // attempting schema validation of the config (times out on offline CI runners)
+            .replace(Regex("""\s+xmlns:xsi="[^"]*""""), "")
             .replace(Regex("""\s+xsi:schemaLocation="[^"]*""""), "")
 
         val tempConfigFile = Files.createTempFile("jhove-config", ".xml")
@@ -238,6 +251,7 @@ class Jhove : AbstractProcessor() {
 
             val jhoveBase = JhoveBase()
             jhoveBase.init(configPath, null)
+            injectLocalSchemas(jhoveBase)
             val handler = jhoveBase.getHandler("xml")
             jhoveBase.checksumFlag = true
             jhoveBase.encoding = "UTF-8"
@@ -380,6 +394,26 @@ class Jhove : AbstractProcessor() {
         )
 
         return results
+    }
+
+    /**
+     * Injects local schema mappings directly into JHOVE's XmlModule via reflection.
+     * This guarantees _localSchemas is populated regardless of whether the config
+     * file <param> elements were processed correctly by JHOVE's ConfigHandler.
+     */
+    private fun injectLocalSchemas(jhoveBase: JhoveBase) {
+        try {
+            val xmlModule = jhoveBase.getModule("XML-hul") ?: return
+            val field = xmlModule.javaClass.getDeclaredField("_localSchemas")
+            field.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            val schemas = field.get(xmlModule) as? MutableMap<String, File> ?: return
+            for ((url, file) in localSchemaMap) {
+                schemas[url.lowercase()] = file
+            }
+        } catch (e: Exception) {
+            getLogger().warn("Could not inject local schemas into XmlModule: ${e.message}")
+        }
     }
 
     override fun onTrigger(context: ProcessContext, session: ProcessSession) {
