@@ -186,7 +186,15 @@ class Jhove : AbstractProcessor() {
             "    <param>schema=$url;${path.toAbsolutePath()}</param>"
         }
 
-        // Update jhoveconf.xml: replace the single placeholder param with all schema mappings
+        // Extract jhoveConfig schema from JHOVE core JAR so config validation stays local
+        val configSchemaFile = Files.createTempFile("jhoveConfig-schema-", ".xsd")
+        configSchemaFile.toFile().deleteOnExit()
+        JhoveBase::class.java.getResourceAsStream("/edu/harvard/hul/ois/jhove/jhoveConfig.xsd")?.use {
+            Files.copy(it, configSchemaFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+
+        // Update jhoveconf.xml: replace the single placeholder param with all schema mappings,
+        // and redirect xsi:schemaLocation to the local config schema file
         val configContent = configStream.bufferedReader().readText()
         val placeholder = "    <param>schema=http://www.example.com/schema;/home/schemas/exampleschema.xsd</param>"
         check(configContent.contains(placeholder)) {
@@ -194,10 +202,10 @@ class Jhove : AbstractProcessor() {
         }
         val updatedConfig = configContent
             .replace(placeholder, schemaParams)
-            // Strip xsi namespace and schemaLocation to prevent JhoveBase.init() from
-            // attempting schema validation of the config (times out on offline CI runners)
-            .replace(Regex("""\s+xmlns:xsi="[^"]*""""), "")
-            .replace(Regex("""\s+xsi:schemaLocation="[^"]*""""), "")
+            .replace(
+                Regex("""xsi:schemaLocation="[^"]*""""),
+                """xsi:schemaLocation="http://hul.harvard.edu/ois/xml/ns/jhove/jhoveConfig ${configSchemaFile.toUri()}""""
+            )
 
         val tempConfigFile = Files.createTempFile("jhove-config", ".xml")
         tempConfigFile.toFile().deleteOnExit()
