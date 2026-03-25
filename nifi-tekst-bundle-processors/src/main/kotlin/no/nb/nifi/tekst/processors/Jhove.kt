@@ -166,10 +166,11 @@ class Jhove : AbstractProcessor() {
 
         // Update jhoveconf.xml: replace the single placeholder param with all schema mappings
         val configContent = configStream.bufferedReader().readText()
-        val updatedConfig = configContent.replace(
-            "<param>schema=http://www.example.com/schema;/home/schemas/exampleschema.xsd</param>",
-            schemaParams
-        )
+        val placeholder = "    <param>schema=http://www.example.com/schema;/home/schemas/exampleschema.xsd</param>"
+        check(configContent.contains(placeholder)) {
+            "jhoveconf.xml does not contain the expected schema placeholder – local schema mappings cannot be injected"
+        }
+        val updatedConfig = configContent.replace(placeholder, schemaParams)
 
         val tempConfigFile = Files.createTempFile("jhove-config", ".xml")
         tempConfigFile.toFile().deleteOnExit()
