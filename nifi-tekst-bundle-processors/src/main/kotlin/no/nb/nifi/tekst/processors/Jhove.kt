@@ -56,8 +56,14 @@ class Jhove : AbstractProcessor() {
         private const val METS_XSD_RESOURCE = "/xsd/mets.xsd"
         private const val METS_SCHEMA_URL = "http://www.loc.gov/standards/mets/mets.xsd"
 
+        private const val METS2_XSD_RESOURCE = "/xsd/mets2.xsd"
+        private const val METS2_SCHEMA_URL = "https://loc.gov/standards/mets/mets2.xsd"
+
         private const val MIX10_XSD_RESOURCE = "/xsd/mix10.xsd"
         private const val MIX10_SCHEMA_URL = "http://www.loc.gov/standards/mix/mix10/mix10.xsd"
+
+        private const val MIX20_XSD_RESOURCE = "/xsd/mix20.xsd"
+        private const val MIX20_SCHEMA_URL = "https://www.loc.gov/standards/mix/mix.xsd"
 
         private const val XLINK_XSD_RESOURCE = "/xsd/xlink.xsd"
         private const val XLINK_SCHEMA_URL = "http://www.loc.gov/standards/xlink/xlink.xsd"
@@ -151,14 +157,18 @@ class Jhove : AbstractProcessor() {
 
         val tempAltoXsdFile  = extractXsd(ALTO_XSD_RESOURCE)
         val tempMetsXsdFile  = extractXsd(METS_XSD_RESOURCE)
+        val tempMets2XsdFile = extractXsd(METS2_XSD_RESOURCE)
         val tempMix10XsdFile = extractXsd(MIX10_XSD_RESOURCE)
+        val tempMix20XsdFile = extractXsd(MIX20_XSD_RESOURCE)
         val tempXlinkXsdFile = extractXsd(XLINK_XSD_RESOURCE)
 
         // Build all <param> lines for schema mappings
         val schemaParams = listOf(
             ALTO_SCHEMA_URL  to tempAltoXsdFile,
             METS_SCHEMA_URL  to tempMetsXsdFile,
+            METS2_SCHEMA_URL to tempMets2XsdFile,
             MIX10_SCHEMA_URL to tempMix10XsdFile,
+            MIX20_SCHEMA_URL to tempMix20XsdFile,
             XLINK_SCHEMA_URL to tempXlinkXsdFile
         ).joinToString("\n") { (url, path) ->
             "    <param>schema=$url;${path.toAbsolutePath()}</param>"
