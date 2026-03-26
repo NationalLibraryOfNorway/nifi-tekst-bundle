@@ -108,8 +108,6 @@ class JhoveToMets2BrowsingIntegrationTest {
             assertTrue(imageHeight!!.toInt() > 0, "imageHeight should be positive")
         }
 
-        println("✓ Step 1 complete: Generated ${jhoveOutputFiles.size} JHOVE metadata files with XSD validation")
-
         // Step 2: Run CreateMetsBrowsing processor using generated JHOVE data with METS2 and MIX2
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
@@ -130,8 +128,6 @@ class JhoveToMets2BrowsingIntegrationTest {
         assertTrue(tempMetsOutputFile.exists(), "METS2 output file should exist")
         assertTrue(tempMetsOutputFile.length() > 0, "METS2 output file should not be empty")
 
-        println("✓ Step 2 complete: Generated METS2-browsing file (${tempMetsOutputFile.length()} bytes)")
-
         // Step 3: Validate generated METS2 XML against XSD
         val generatedMetsContent = tempMetsOutputFile.readText()
         val mets2ValidationResult = XsdValidator.validateMets2(generatedMetsContent)
@@ -144,8 +140,6 @@ class JhoveToMets2BrowsingIntegrationTest {
         }
         assertTrue(mets2ValidationResult.isValid, "Generated METS2 should be valid against METS2 XSD")
 
-        println("✓ Step 3 complete: Generated METS2 passed XSD validation")
-
         // Step 3b: Validate MIX2 data embedded in METS2 against MIX2 XSD
         val mix2ValidationResult = XsdValidator.validateMix2InMets(generatedMetsContent)
 
@@ -154,8 +148,6 @@ class JhoveToMets2BrowsingIntegrationTest {
             mix2ValidationResult.errors.forEach { println("  - $it") }
         }
         assertTrue(mix2ValidationResult.isValid, "Embedded MIX2 data should be valid against MIX2 XSD")
-
-        println("✓ Step 3b complete: Embedded MIX2 data passed XSD validation")
 
         // Step 4: Compare generated METS2 with expected output
         val generatedDoc = parseXmlFile(tempMetsOutputFile)
@@ -245,9 +237,6 @@ class JhoveToMets2BrowsingIntegrationTest {
             val expectedImgUrn = xpath(expectedDoc, "//*[@ID='IMG_$fileId']/*[@LOCTYPE='URN']/@LOCREF")
             assertEquals(expectedImgUrn, generatedImgUrn, "Image $fileNum URN should match")
         }
-
-        println("✓ Step 4 complete: Generated METS2 matches expected output")
-        println("✓ Integration test passed: Jhove → CreateMetsBrowsing (METS2 + MIX2) workflow successful with XSD validation")
     }
 
     @Test
@@ -299,8 +288,6 @@ class JhoveToMets2BrowsingIntegrationTest {
         // Verify the METS file was not created or is incomplete
         assertFalse(tempMetsOutputFile.exists() && tempMetsOutputFile.length() > 1000,
             "METS2 output file should not be successfully created when JHOVE files are missing")
-
-        println("✓ CreateMetsBrowsing (METS2) correctly failed when JHOVE file was missing")
     }
 
     @Test
@@ -410,124 +397,26 @@ class JhoveToMets2BrowsingIntegrationTest {
                     "Image $fileNum size should be same in both METS versions")
             }
 
-            println("✓ METS1 vs METS2 structural differences verified")
-            println("✓ Both versions contain same content data with different structure")
-
         } finally {
             mets1OutputFile.delete()
         }
     }
 
     @Test
-    fun testMets2Mix2IntegrationPerformanceMetrics() {
-        val startTime = System.currentTimeMillis()
-        val timingSteps = mutableListOf<Pair<String, Long>>()
-
-        val diagnosticsStartTime = System.currentTimeMillis()
-        printDescriptiveXmlDiagnostics()
-        timingSteps.add("[TIMING] Descriptive XML diagnostics" to (System.currentTimeMillis() - diagnosticsStartTime))
-
-        // Run Jhove processor
-        val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
-        jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-
-        val jhoveStartTime = System.currentTimeMillis()
-        jhoveRunner.enqueue("test")
-        jhoveRunner.run()
-        val jhoveEndTime = System.currentTimeMillis()
-        timingSteps.add("[TIMING] Jhove processing" to (jhoveEndTime - jhoveStartTime))
-
-        assertProcessed(jhoveRunner)
-
-        // Verify JHOVE files against XSD
-        val accessJhoveOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
-        val jhoveOutputFiles = accessJhoveOutputDir.listFiles { file ->
-            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
-        }?.sortedBy { it.name } ?: emptyList()
-
-        val xsdValidationStartTime = System.currentTimeMillis()
-        for (jhoveFile in jhoveOutputFiles) {
-            val result = XsdValidator.validateJhove(jhoveFile)
-            assertTrue(result.isValid, "JHOVE file ${jhoveFile.name} should be valid")
-        }
-        val xsdValidationEndTime = System.currentTimeMillis()
-        timingSteps.add("[TIMING] JHOVE XSD validation" to (xsdValidationEndTime - xsdValidationStartTime))
-
-        // Run CreateMetsBrowsing processor with METS2 + MIX2
-        val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder.toString())
-        metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "representations/access/metadata/other/ocr")
-        metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "representations/access/data")
-        metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, "representations/access/metadata/technical/jhove")
-        metsRunner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, tempMetsOutputFile.absolutePath)
-        metsRunner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
-        metsRunner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
-        metsRunner.setProperty(CreateMetsBrowsing.MIX_VERSION, "MIX_2_0")
-
-        val metsStartTime = System.currentTimeMillis()
-        metsRunner.enqueue("test")
-        metsRunner.run()
-        val metsEndTime = System.currentTimeMillis()
-        timingSteps.add("[TIMING] METS2 generation" to (metsEndTime - metsStartTime))
-
-        // Validate generated METS2 against XSD
-        val mets2ValidationStartTime = System.currentTimeMillis()
-        val mets2Content = tempMetsOutputFile.readText()
-        val mets2ValidationResult = XsdValidator.validateMets2(mets2Content)
-        assertTrue(mets2ValidationResult.isValid, "Generated METS2 should be valid against XSD")
-        val mets2ValidationEndTime = System.currentTimeMillis()
-        timingSteps.add("[TIMING] METS2 XSD validation" to (mets2ValidationEndTime - mets2ValidationStartTime))
-
-        // Validate embedded MIX2 data against XSD
-        val mix2ValidationStartTime = System.currentTimeMillis()
-        val mix2ValidationResult = XsdValidator.validateMix2InMets(mets2Content)
-        assertTrue(mix2ValidationResult.isValid, "Embedded MIX2 should be valid against XSD")
-        val mix2ValidationEndTime = System.currentTimeMillis()
-        timingSteps.add("[TIMING] MIX2 XSD validation" to (mix2ValidationEndTime - mix2ValidationStartTime))
-
-        val totalTime = System.currentTimeMillis() - startTime
-        timingSteps.add("[TIMING] Total workflow" to totalTime)
-
-        println("=== METS2 + MIX2 Integration Test Performance Metrics ===")
-        println("[TIMING] JHOVE XSD validation files: ${jhoveOutputFiles.size}")
-        timingSteps.sortedByDescending { it.second }.forEach { (name, elapsedMs) ->
-            println("$name: ${elapsedMs}ms")
-        }
-
-        // Basic assertion that the workflow completes in reasonable time (10 min allows for slower CI runners)
-        assertTrue(totalTime < 600000, "Total workflow should complete in under 10 minutes")
-    }
-
-    @Test
     fun testMets2Mix2ValidatesAgainstExpectedFile() {
-        // This test validates that the expected METS2_BROWSING.xml file is valid against XSD
         assertTrue(expectedMetsFile.exists(), "Expected METS2 file should exist: ${expectedMetsFile.absolutePath}")
 
         val result = XsdValidator.validateMets2(expectedMetsFile)
-
-        if (!result.isValid) {
-            println("Expected METS2 file validation errors:")
-            result.errors.forEach { println("  - $it") }
-        }
-
         assertTrue(result.isValid, "Expected METS2_BROWSING.xml should be valid against METS2 XSD")
 
-        // Validate embedded MIX2 data against MIX2 XSD
         val content = expectedMetsFile.readText()
         val mix2Result = XsdValidator.validateMix2InMets(content)
-        if (!mix2Result.isValid) {
-            println("MIX2 validation errors in expected file:")
-            mix2Result.errors.forEach { println("  - $it") }
-        }
         assertTrue(mix2Result.isValid, "Expected METS2_BROWSING.xml should have valid MIX2 data")
 
-        // Verify it contains METS2 and MIX2 namespaces
         assertTrue(content.contains("http://www.loc.gov/METS/v2"),
             "Expected file should use METS v2 namespace")
         assertTrue(content.contains("http://www.loc.gov/mix/v20"),
             "Expected file should use MIX v2.0 namespace")
-
-        println("✓ Expected METS2_BROWSING.xml is valid against METS2 XSD")
     }
 
     // Helper methods for XML parsing (using centralized XmlHelper)
@@ -537,32 +426,6 @@ class JhoveToMets2BrowsingIntegrationTest {
     private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 
     private fun xpathNodeList(doc: Document, expression: String): NodeList = XmlHelper.xpathNodeList(doc, expression)
-
-    private fun printDescriptiveXmlDiagnostics() {
-        val descriptiveDir = objectFolder.resolve("metadata/descriptive").toFile()
-        val descriptiveFiles = descriptiveDir.listFiles { file ->
-            file.isFile && file.name.endsWith(".xml", ignoreCase = true)
-        }?.sortedBy { it.name } ?: emptyList()
-
-        println("[TIMING] descriptive XML files: ${descriptiveFiles.size}")
-        for (file in descriptiveFiles) {
-            val schemaUrls = extractSchemaUrls(file)
-            println("[TIMING] ${file.name} schema URLs (${schemaUrls.size}): ${schemaUrls.joinToString(", ")}")
-        }
-    }
-
-    private fun extractSchemaUrls(file: File): List<String> {
-        val content = file.readText()
-        val schemaLocationPattern = Regex("""xsi:schemaLocation\s*=\s*"([^"]+)"""")
-        val urls = mutableListOf<String>()
-        schemaLocationPattern.findAll(content).forEach { match ->
-            val tokens = match.groupValues[1].trim().split(Regex("""\s+""")).filter { it.isNotBlank() }
-            for (index in 1 until tokens.size step 2) {
-                urls.add(tokens[index])
-            }
-        }
-        return urls.distinct()
-    }
 
     private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
         val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +

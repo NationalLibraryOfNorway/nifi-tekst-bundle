@@ -147,7 +147,7 @@ class Jhove : AbstractProcessor() {
         val configStream = javaClass.getResourceAsStream(JHOVE_CONFIG_RESOURCE)
             ?: throw IllegalStateException("Could not load JHOVE config from classpath")
 
-        // Extract all XSD resources to temp files so JHOVE's XML module resolves them locally
+        // Extract XSD resources to temp files for local schema resolution
         fun extractXsd(resource: String): java.nio.file.Path {
             val stream = javaClass.getResourceAsStream(resource)
                 ?: throw IllegalStateException("Could not load XSD from classpath: $resource")
@@ -164,19 +164,16 @@ class Jhove : AbstractProcessor() {
         val tempMix20XsdFile = extractXsd(MIX20_XSD_RESOURCE)
         val tempXlinkXsdFile = extractXsd(XLINK_XSD_RESOURCE)
 
-        // Map schema URLs AND namespace URIs to local temp files for direct injection into XmlModule.
-        // Xerces resolves both xsi:schemaLocation URLs and namespace URIs via the entity resolver.
+        // Schema URLs and namespace URIs mapped to local temp files, injected into
+        // JHOVE's XmlModule via _defaultParams so entity resolution stays offline.
         localSchemaMap = mapOf(
-            // Schema location URLs (from xsi:schemaLocation in XML files)
             ALTO_SCHEMA_URL  to tempAltoXsdFile.toFile(),
             METS_SCHEMA_URL  to tempMetsXsdFile.toFile(),
             METS2_SCHEMA_URL to tempMets2XsdFile.toFile(),
             MIX10_SCHEMA_URL to tempMix10XsdFile.toFile(),
             MIX20_SCHEMA_URL to tempMix20XsdFile.toFile(),
             XLINK_SCHEMA_URL to tempXlinkXsdFile.toFile(),
-            // Schema URL imported by alto-1-2.xsd (different xlink variant)
             "http://schema.ccs-gmbh.com/METAe/xlink.xsd" to tempXlinkXsdFile.toFile(),
-            // Namespace URIs (Xerces tries these as fallback schema locations)
             "http://www.loc.gov/METS/"       to tempMetsXsdFile.toFile(),
             "http://www.loc.gov/METS/v2"     to tempMets2XsdFile.toFile(),
             "http://www.loc.gov/mix/v10"     to tempMix10XsdFile.toFile(),
@@ -185,35 +182,16 @@ class Jhove : AbstractProcessor() {
             "http://www.w3.org/TR/xlink"     to tempXlinkXsdFile.toFile()
         )
 
-        // Build all <param> lines for schema mappings (fallback if config parsing works)
-        val schemaParams = listOf(
-            ALTO_SCHEMA_URL  to tempAltoXsdFile,
-            METS_SCHEMA_URL  to tempMetsXsdFile,
-            METS2_SCHEMA_URL to tempMets2XsdFile,
-            MIX10_SCHEMA_URL to tempMix10XsdFile,
-            MIX20_SCHEMA_URL to tempMix20XsdFile,
-            XLINK_SCHEMA_URL to tempXlinkXsdFile,
-            "http://schema.ccs-gmbh.com/METAe/xlink.xsd" to tempXlinkXsdFile
-        ).joinToString("\n") { (url, path) ->
-            "    <param>schema=$url;${path.toAbsolutePath()}</param>"
-        }
-
-        // Extract jhoveConfig schema from JHOVE core JAR so config validation stays local
+        // Redirect jhoveconf.xml's xsi:schemaLocation to a local copy of the config schema
+        // so JhoveBase.init() doesn't fetch it over HTTP
         val configSchemaFile = Files.createTempFile("jhoveConfig-schema-", ".xsd")
         configSchemaFile.toFile().deleteOnExit()
         JhoveBase::class.java.getResourceAsStream("/edu/harvard/hul/ois/jhove/jhoveConfig.xsd")?.use {
             Files.copy(it, configSchemaFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         }
 
-        // Update jhoveconf.xml: replace the single placeholder param with all schema mappings,
-        // and redirect xsi:schemaLocation to the local config schema file
         val configContent = configStream.bufferedReader().readText()
-        val placeholder = "    <param>schema=http://www.example.com/schema;/home/schemas/exampleschema.xsd</param>"
-        check(configContent.contains(placeholder)) {
-            "jhoveconf.xml does not contain the expected schema placeholder – local schema mappings cannot be injected"
-        }
         val updatedConfig = configContent
-            .replace(placeholder, schemaParams)
             .replace(
                 Regex("""xsi:schemaLocation="[^"]*""""),
                 """xsi:schemaLocation="http://hul.harvard.edu/ois/xml/ns/jhove/jhoveConfig ${configSchemaFile.toUri()}""""
@@ -417,21 +395,12 @@ class Jhove : AbstractProcessor() {
     }
 
     /**
-     * Injects local schema mappings into JHOVE's XmlModule via reflection.
-     *
-     * We inject into the module's _defaultParams list (on ModuleBase) rather than
-     * _localSchemas directly, because dispatch() → applyDefaultParams() → resetParams()
-     * replaces _localSchemas with a new empty HashMap before every parse.
-     *
-     * All URLs are lowercased because JHOVE's addLocalSchema() stores keys with original
-     * case, but resolveEntity() lowercases the systemId for lookup — a case mismatch bug
-     * in JHOVE itself. By injecting already-lowercase URLs, the stored keys match the
-     * lowercased lookup.
+     * Adds local schema mappings to JHOVE's XmlModule _defaultParams via reflection.
+     * Uses lowercased URLs to match JHOVE's lowercased entity resolution lookup.
      */
     private fun injectLocalSchemas(jhoveBase: JhoveBase) {
         try {
             val xmlModule = jhoveBase.getModule("XML-hul") ?: return
-            // _defaultParams is declared on ModuleBase (XmlModule's superclass)
             val field = xmlModule.javaClass.superclass.getDeclaredField("_defaultParams")
             field.isAccessible = true
             @Suppress("UNCHECKED_CAST")

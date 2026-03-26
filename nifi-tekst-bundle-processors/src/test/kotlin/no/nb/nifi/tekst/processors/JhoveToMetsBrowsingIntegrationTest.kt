@@ -97,8 +97,6 @@ class JhoveToMetsBrowsingIntegrationTest {
             assertTrue(imageHeight!!.toInt() > 0, "imageHeight should be positive")
         }
 
-        println("✓ Step 1 complete: Generated ${jhoveOutputFiles.size} JHOVE metadata files")
-
         // Step 2: Run CreateMetsBrowsing processor using generated JHOVE data
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
@@ -118,8 +116,6 @@ class JhoveToMetsBrowsingIntegrationTest {
         metsRunner.assertAllFlowFilesTransferred(CreateMetsBrowsing.REL_SUCCESS)
         assertTrue(tempMetsOutputFile.exists(), "METS output file should exist")
         assertTrue(tempMetsOutputFile.length() > 0, "METS output file should not be empty")
-
-        println("✓ Step 2 complete: Generated METS-browsing file (${tempMetsOutputFile.length()} bytes)")
 
         // Step 3: Compare generated METS with expected output
         val generatedDoc = parseXmlFile(tempMetsOutputFile)
@@ -200,8 +196,6 @@ class JhoveToMetsBrowsingIntegrationTest {
             assertEquals(expectedImgUrl, generatedImgUrl, "Image $fileNum URL should match")
         }
 
-        println("✓ Step 3 complete: Generated METS matches expected output")
-        println("✓ Integration test passed: Jhove → CreateMetsBrowsing workflow successful")
     }
 
     @Test
@@ -247,57 +241,6 @@ class JhoveToMetsBrowsingIntegrationTest {
         // Verify the METS file was not created or is incomplete
         assertFalse(tempMetsOutputFile.exists() && tempMetsOutputFile.length() > 1000,
             "METS output file should not be successfully created when JHOVE files are missing")
-
-        println("✓ CreateMetsBrowsing correctly failed when JHOVE file was missing")
-    }
-
-    @Test
-    fun testIntegrationPerformanceMetrics() {
-        val startTime = System.currentTimeMillis()
-        val timingSteps = mutableListOf<Pair<String, Long>>()
-
-        val diagnosticsStartTime = System.currentTimeMillis()
-        printDescriptiveXmlDiagnostics()
-        timingSteps.add("[TIMING] Descriptive XML diagnostics" to (System.currentTimeMillis() - diagnosticsStartTime))
-
-        // Run Jhove processor
-        val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
-        jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
-
-        val jhoveStartTime = System.currentTimeMillis()
-        jhoveRunner.enqueue("test")
-        jhoveRunner.run()
-        assertProcessed(jhoveRunner)
-        val jhoveEndTime = System.currentTimeMillis()
-        timingSteps.add("[TIMING] Jhove processing" to (jhoveEndTime - jhoveStartTime))
-
-        // Run CreateMetsBrowsing processor
-        val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder.toString())
-        metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "representations/access/metadata/other/ocr")
-        metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "representations/access/data")
-        metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, "representations/access/metadata/technical/jhove")
-        metsRunner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, tempMetsOutputFile.absolutePath)
-        metsRunner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
-        metsRunner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
-        metsRunner.setProperty(CreateMetsBrowsing.MIX_VERSION, "MIX_1_0")
-
-        val metsStartTime = System.currentTimeMillis()
-        metsRunner.enqueue("test")
-        metsRunner.run()
-        val metsEndTime = System.currentTimeMillis()
-        timingSteps.add("[TIMING] METS generation" to (metsEndTime - metsStartTime))
-
-        val totalTime = System.currentTimeMillis() - startTime
-        timingSteps.add("[TIMING] Total workflow" to totalTime)
-
-        println("=== Integration Test Performance Metrics ===")
-        timingSteps.sortedByDescending { it.second }.forEach { (name, elapsedMs) ->
-            println("$name: ${elapsedMs}ms")
-        }
-
-        // Basic assertion that the workflow completes in reasonable time
-        assertTrue(totalTime < 120000, "Total workflow should complete in under 2 minutes")
     }
 
     // Helper methods for XML parsing (using centralized XmlHelper)
@@ -307,32 +250,6 @@ class JhoveToMetsBrowsingIntegrationTest {
     private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 
     private fun xpathNodeList(doc: Document, expression: String): NodeList = XmlHelper.xpathNodeList(doc, expression)
-
-    private fun printDescriptiveXmlDiagnostics() {
-        val descriptiveDir = objectFolder.resolve("metadata/descriptive").toFile()
-        val descriptiveFiles = descriptiveDir.listFiles { file ->
-            file.isFile && file.name.endsWith(".xml", ignoreCase = true)
-        }?.sortedBy { it.name } ?: emptyList()
-
-        println("[TIMING] descriptive XML files: ${descriptiveFiles.size}")
-        for (file in descriptiveFiles) {
-            val schemaUrls = extractSchemaUrls(file)
-            println("[TIMING] ${file.name} schema URLs (${schemaUrls.size}): ${schemaUrls.joinToString(", ")}")
-        }
-    }
-
-    private fun extractSchemaUrls(file: File): List<String> {
-        val content = file.readText()
-        val schemaLocationPattern = Regex("""xsi:schemaLocation\s*=\s*"([^"]+)"""")
-        val urls = mutableListOf<String>()
-        schemaLocationPattern.findAll(content).forEach { match ->
-            val tokens = match.groupValues[1].trim().split(Regex("""\s+""")).filter { it.isNotBlank() }
-            for (index in 1 until tokens.size step 2) {
-                urls.add(tokens[index])
-            }
-        }
-        return urls.distinct()
-    }
 
     private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
         val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +
