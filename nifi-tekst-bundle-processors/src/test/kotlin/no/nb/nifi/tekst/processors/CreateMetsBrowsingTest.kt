@@ -16,7 +16,7 @@ class CreateMetsBrowsingTest {
 
     private lateinit var outputFile: File
     private val projectFolder = Paths.get("").toAbsolutePath().toString()
-    private val expectedFile = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS_BROWSING.xml")
+    private val expectedFile = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS_BROWSING.xml")
     private val objectFolder = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
     private val altoFolderRelative = "representations/access/metadata/other/ocr"
     private val imageFolderRelative = "representations/access/data"
@@ -427,7 +427,7 @@ class CreateMetsBrowsingTest {
 
     // ========== METS2 + MIX2 Tests ==========
 
-    private val expectedMets2File = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml")
+    private val expectedMets2File = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml")
 
     @Test
     fun testSuccessfulMets2BrowsingGeneration() {

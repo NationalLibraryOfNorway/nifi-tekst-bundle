@@ -14,19 +14,11 @@ object TestObjectFolderHelper {
         // Primary data: representations/primary/data
         copyDir(fixtureRoot.resolve("representations/primary/data"), objectFolder.resolve("representations/primary/data"))
 
-        // Access data: try representations/access/data first, then legacy representations/primary/access/data
-        copyDirWithFallback(
-            fixtureRoot,
-            listOf("representations/access/data", "representations/primary/access/data"),
-            objectFolder.resolve("representations/access/data")
-        )
+        // Access data: representations/access/data
+        copyDir(fixtureRoot.resolve("representations/access/data"), objectFolder.resolve("representations/access/data"))
 
-        // OCR data: try representations/access/metadata/other/ocr first, then legacy representations/primary/access/metadata/other/ocr
-        copyDirWithFallback(
-            fixtureRoot,
-            listOf("representations/access/metadata/other/ocr", "representations/primary/access/metadata/other/ocr"),
-            objectFolder.resolve("representations/access/metadata/other/ocr")
-        )
+        // OCR data: representations/access/metadata/other/ocr
+        copyDir(fixtureRoot.resolve("representations/access/metadata/other/ocr"), objectFolder.resolve("representations/access/metadata/other/ocr"))
 
         val descriptiveTarget = objectFolder.resolve("metadata/descriptive")
         Files.createDirectories(descriptiveTarget)
@@ -43,15 +35,6 @@ object TestObjectFolderHelper {
         objectFolder.toFile().deleteRecursively()
     }
 
-    private fun copyDirWithFallback(fixtureRoot: Path, sourceCandidates: List<String>, target: Path) {
-        for (candidate in sourceCandidates) {
-            val source = fixtureRoot.resolve(candidate)
-            if (Files.exists(source)) {
-                copyDir(source, target)
-                return
-            }
-        }
-    }
 
     private fun copyDir(source: Path, target: Path) {
         if (!Files.exists(source)) {
@@ -65,7 +48,7 @@ object TestObjectFolderHelper {
                     Files.createDirectories(destination)
                 } else {
                     Files.createDirectories(destination.parent)
-                    Files.createSymbolicLink(destination, path.toAbsolutePath())
+                    Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING)
                 }
             }
         }

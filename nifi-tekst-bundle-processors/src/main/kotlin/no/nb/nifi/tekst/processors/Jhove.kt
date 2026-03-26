@@ -24,7 +24,7 @@ import javax.xml.xpath.XPathFactory
 @Tags("NB", "Validation", "JHOVE")
 @CapabilityDescription(
     ("Validates required files in subfolders of an object folder with JHOVE and writes the JHOVE XML output to the corresponding target folders. " +
-            "The processor recursively validates files in defined subfolders, checking all generated XML files to return valid/well-formed statuses. " +
+            "The processor validates files in defined subfolders, checking all generated XML files to return valid/well-formed statuses. " +
             "Note that to force XML output compliant with MIX10, and hence compatible with CreateMetsBrowsing, " +
             "we've added <mixVersion>1.0</mixVersion> to jhoveconf.xml")
 )
@@ -376,6 +376,7 @@ class Jhove : AbstractProcessor() {
                 logger("JHOVE output failed XSD validation for ${inputFile.fileName}: ${validationResult.getErrorMessage()}")
                 results.add(
                     status.copy(
+                        isValid = false,
                         errorMessage = if (status.errorMessage.isNullOrBlank()) xsdError else "${status.errorMessage} | $xsdError"
                     )
                 )

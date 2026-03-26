@@ -37,11 +37,11 @@ class JhoveToMets2BrowsingIntegrationTest {
     )
     private val descriptiveXml = Paths.get(
         projectFolder,
-        "src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml"
+        "src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml"
     )
 
     private val expectedMetsFile = File(
-        "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml"
+        "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml"
     )
 
     private val objectId: String

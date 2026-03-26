@@ -83,7 +83,7 @@ class RegenerateMetsFilesTest {
         )
 
         // Write to test resources
-        val outputFile = File("$projectFolder/src/test/resources/${tekstUuid}-METS2_BROWSING.xml")
+        val outputFile = File("$projectFolder/src/test/resources/${tekstUuid}/${tekstUuid}-METS2_BROWSING.xml")
         outputFile.writeText(metsXml)
 
         println("Generated METS v2 + MIX v2.0 file: ${outputFile.absolutePath}")

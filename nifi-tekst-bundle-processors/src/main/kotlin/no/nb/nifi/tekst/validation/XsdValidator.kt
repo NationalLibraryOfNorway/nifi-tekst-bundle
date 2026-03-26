@@ -40,7 +40,8 @@ object XsdValidator {
             "http://schema.openpreservation.org/ois/xml/xsd/jhove/1.10/jhove.xsd" to JHOVE_XSD_RESOURCE,
             "https://schema.openpreservation.org/ois/xml/xsd/jhove/1.8/jhove.xsd" to JHOVE_XSD_RESOURCE,
             "http://schema.openpreservation.org/ois/xml/xsd/jhove/1.8/jhove.xsd" to JHOVE_XSD_RESOURCE,
-            "http://schema.ccs-gmbh.com/metae/alto-1-2.xsd" to ALTO_XSD_RESOURCE
+            "http://schema.ccs-gmbh.com/metae/alto-1-2.xsd" to ALTO_XSD_RESOURCE,
+            "http://schema.ccs-gmbh.com/METAe/xlink.xsd" to XLINK_XSD_RESOURCE
         )
 
         override fun resolveResource(

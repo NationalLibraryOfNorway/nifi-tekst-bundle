@@ -18,7 +18,7 @@ class RegenerateJhoveFilesTest {
     )
     private val descriptiveXml = Paths.get(
         projectFolder,
-        "src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS_BROWSING.xml"
+        "src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS_BROWSING.xml"
     )
 
     @Test
