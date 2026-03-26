@@ -417,19 +417,27 @@ class Jhove : AbstractProcessor() {
     }
 
     /**
-     * Injects local schema mappings directly into JHOVE's XmlModule via reflection.
-     * This guarantees _localSchemas is populated regardless of whether the config
-     * file <param> elements were processed correctly by JHOVE's ConfigHandler.
+     * Injects local schema mappings into JHOVE's XmlModule via reflection.
+     *
+     * We inject into the module's _defaultParams list (on ModuleBase) rather than
+     * _localSchemas directly, because dispatch() → applyDefaultParams() → resetParams()
+     * replaces _localSchemas with a new empty HashMap before every parse.
+     *
+     * All URLs are lowercased because JHOVE's addLocalSchema() stores keys with original
+     * case, but resolveEntity() lowercases the systemId for lookup — a case mismatch bug
+     * in JHOVE itself. By injecting already-lowercase URLs, the stored keys match the
+     * lowercased lookup.
      */
     private fun injectLocalSchemas(jhoveBase: JhoveBase) {
         try {
             val xmlModule = jhoveBase.getModule("XML-hul") ?: return
-            val field = xmlModule.javaClass.getDeclaredField("_localSchemas")
+            // _defaultParams is declared on ModuleBase (XmlModule's superclass)
+            val field = xmlModule.javaClass.superclass.getDeclaredField("_defaultParams")
             field.isAccessible = true
             @Suppress("UNCHECKED_CAST")
-            val schemas = field.get(xmlModule) as? MutableMap<String, File> ?: return
+            val defaultParams = field.get(xmlModule) as? MutableList<String> ?: return
             for ((url, file) in localSchemaMap) {
-                schemas[url.lowercase()] = file
+                defaultParams.add("schema=${url.lowercase()};${file.absolutePath}")
             }
         } catch (e: Exception) {
             getLogger().warn("Could not inject local schemas into XmlModule: ${e.message}")
