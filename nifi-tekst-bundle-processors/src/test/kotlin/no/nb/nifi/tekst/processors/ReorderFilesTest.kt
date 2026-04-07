@@ -2,6 +2,7 @@ package no.nb.nifi.tekst.processors
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import no.nb.utils.TestFileUtils
 import no.nb.utils.UUIDv7
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -13,6 +14,7 @@ import org.apache.nifi.util.TestRunner
 import org.apache.nifi.util.TestRunners
 import org.junit.jupiter.api.BeforeEach
 import java.nio.file.Files
+import kotlin.test.assertNotNull
 
 class ReorderFilesTest {
     private val reorderFiles = ReorderFiles()
@@ -25,16 +27,9 @@ class ReorderFilesTest {
     private fun stripPath(entries: List<Map<String, String>>): List<Map<String, String>> =
         entries.map { entry -> entry.mapValues { (_, v) -> v.substringAfterLast('/') } }
 
-    private fun readFile(fileName: String): JsonNode {
-        val resource = this::class.java.classLoader.getResource("reorder-files/$fileName")
-        requireNotNull(resource) { "Resource not found" }
-        val jsonContent = File(resource.toURI()).readText()
-        return mapper.readTree(jsonContent)
-    }
-
     @BeforeEach
     fun setUp() {
-        flowFile = readFile("flowfile.json")
+        flowFile = TestFileUtils.readFile("flowfile.json")
         changes = flowFile["changes"]
         runner = TestRunners.newTestRunner(ReorderFiles())
         runner.setProperty(ReorderFiles.BASE_DIR, baseDir.toString())
@@ -47,17 +42,64 @@ class ReorderFilesTest {
     }
 
     @Test
-    fun `processor runs and produces expected output`() {
-        // Prepare input FlowFile content (JSON)
-        val inputJson = Files.readString(Path.of("src/test/resources/reorder-files/flowfile.json"))
+    fun `processor transforms flowfile and produces correct output JSON`() {
+        // Arrange - set up the actual files on disk that the processor will rename
+        val inputJson = mapper.writeValueAsString(flowFile)
+
+        // Create the expected directory structure for each change
+        for (change in changes) {
+            var itemId = change["itemId"]?.asText()?.trim() ?: ""
+            if (itemId.isBlank() || itemId == "null") continue
+            val orderedImages = change["orderedImageIds"] ?: continue
+            orderedImages.forEach { image ->
+                val rawName = image.asText()
+                val filename = if (rawName.startsWith("tekst_")) rawName else "tekst_$rawName"
+                val jp2 = if (filename.endsWith(".jp2")) filename else "$filename.jp2"
+                TestFileUtils.createFile(baseDir, "tekst_$itemId", "access", jp2)
+                TestFileUtils.createFile(baseDir, "tekst_$itemId", "primary", jp2)
+            }
+        }
+
         runner.enqueue(inputJson.toByteArray())
         runner.run()
         runner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
+
+        // Assert output JSON structure
+        val outFlowFile = runner.getFlowFilesForRelationship(ReorderFiles.REL_SUCCESS)[0]
+        val outputJson = mapper.readTree(String(outFlowFile.toByteArray()))
+
+        // Top-level fields match input
+        val topLevelFields = listOf("batchId", "font", "materialType", "publicationType", "language", "digital")
+
+        for (field in topLevelFields) {
+            if (flowFile[field]?.isBoolean == true) {
+                assertEquals(flowFile[field]?.asBoolean(), outputJson[field]?.asBoolean(), "Field '$field' should match")
+            } else {
+                assertEquals(flowFile[field]?.asText(), outputJson[field]?.asText(), "Field '$field' should match")
+            }
+        }
+
+        // Items array has one entry per change with correct page count
+        val items = outputJson["items"]
+        assertNotNull(items, "Output should contain items array")
+        assertEquals(changes.size(), items.size(), "Should have one item per change")
+
+        items.forEachIndexed { index, item ->
+            val change = changes[index]
+            val expectedItemId = change["itemId"]?.asText()
+            val expectedPages = change["orderedImageIds"]?.size() ?: 0
+
+            //Last item in flow file is a new item, so a random UUID is generated so it cannot be compared to input
+            if(expectedItemId != null) {
+                assertEquals(expectedItemId, item["itemId"]?.asText(), "itemId should match for item $index")
+            }
+            assertEquals(expectedPages, item["pages"]?.asInt(), "page count should match for item $index")
+        }
     }
 
     @Test
     fun `addReorderInstructions() provides the correct instructions regardless of order`() {
-        val addInstruction = readFile("addRenameInstruction.json")
+        val addInstruction = TestFileUtils.readFile("addRenameInstruction.json")
         val expected = addInstruction["addInstruction"]
         val expectedOrder = mapper.convertValue(expected, List::class.java) as List<*>
 
