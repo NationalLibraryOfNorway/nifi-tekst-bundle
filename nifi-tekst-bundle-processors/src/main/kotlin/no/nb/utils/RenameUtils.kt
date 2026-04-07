@@ -1,12 +1,12 @@
 package no.nb.utils
 
 import no.nb.models.RenameInstruction
+import no.nb.models.Staged
 import no.nb.models.StagedMove
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.UUID
 
 object RenameUtils {
 
@@ -39,10 +39,9 @@ object RenameUtils {
             return
         }
 
-        val tempDir = baseDir.resolve("temp_conflicts_${UUID.randomUUID()}")
+        val tempDir = baseDir.resolve("temp_conflicts_${UUIDv7.randomUUID()}")
         Files.createDirectories(tempDir)
 
-        data class Staged(val original: Path, val temp: Path)
         val stagedForRollback = mutableListOf<Staged>()
         val stagedMoves = mutableListOf<StagedMove>()
 
@@ -79,7 +78,7 @@ object RenameUtils {
                         return@forEach
                     }
                     try {
-                        val tempFile = tempDir.resolve("${UUID.randomUUID()}_${renameInstruction.originalName}")
+                        val tempFile = tempDir.resolve("${UUIDv7.randomUUID()}_${renameInstruction.originalName}")
                         Files.move(sourceFile, tempFile, StandardCopyOption.REPLACE_EXISTING)
                         stagedForRollback.add(Staged(sourceFile, tempFile))
                         Files.createDirectories(targetDir)

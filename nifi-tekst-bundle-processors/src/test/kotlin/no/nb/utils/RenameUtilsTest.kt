@@ -2,11 +2,10 @@ package no.nb.utils
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import no.nb.models.RenameInstruction
+import no.nb. models.RenameInstruction
 import no.nb.utils.RenameUtils.renameAll
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -26,12 +25,10 @@ class RenameUtilsTest {
             )
         }
 
-
     private fun readFile(): JsonNode {
         val resource = this::class.java.classLoader
             .getResource("reorder-files/renameInstructions.json")
             ?: error("Resource not found: reorder-files/renameInstructions.json")
-
         return mapper.readTree(File(resource.toURI()))
     }
 
@@ -79,9 +76,14 @@ class RenameUtilsTest {
         return access to primary
     }
 
+    /** Creates a file with content in the expected directory structure under tempRoot */
+    private fun createFile(itemId: String, repType: String, filename: String, content: String = "data"): File {
+        val dir = File(tempRoot, "$itemId/representations/$repType/data").apply { mkdirs() }
+        return File(dir, filename).apply { writeText(content) }
+    }
+
     @Test
     fun `renameAll using renameInstructions`() {
-        // Pre-check
         renameInstructions.forEach { instruction ->
             val folderName = instruction.originalName.substringBeforeLast('_')
             val (accessDir, primaryDir) = getDataDirs(tempRoot, folderName)
@@ -96,7 +98,6 @@ class RenameUtilsTest {
 
         expectedByItem.forEach { (itemId, expectedNames) ->
             val (accessDir, primaryDir) = getDataDirs(tempRoot, itemId)
-
             assertEquals(expectedNames, accessDir.listFiles()?.map { it.name }?.toSet().orEmpty())
             assertEquals(expectedNames, primaryDir.listFiles()?.map { it.name }?.toSet().orEmpty())
         }
@@ -125,7 +126,7 @@ class RenameUtilsTest {
     }
 
     @Test
-    fun `renameAll cleans up temporary directory`() {
+    fun `renameAll cleans up temporary directory on success`() {
         renameAll(tempRoot.toPath(), renameInstructions)
 
         // Assert no temp_conflicts_ directory remains
@@ -135,4 +136,64 @@ class RenameUtilsTest {
         assertTrue(tempDirs.isNullOrEmpty(), "Temporary directory should be cleaned up")
     }
 
+    @Test
+    fun `renameAll rolls back all files when one instruction fails`() {
+        val itemId = "tekst_test123"
+        val accessFile = createFile(itemId, "access", "${itemId}_00001.jp2", "access-content")
+        val primaryFile = createFile(itemId, "primary", "${itemId}_00001.jp2", "primary-content")
+
+        val validInstruction = RenameInstruction(
+            originalName = "${itemId}_00001.jp2",
+            newName = "${itemId}_00002.jp2"
+        )
+        val invalidInstruction = RenameInstruction(
+            originalName = "invalid-original",
+            newName = "invalid-new"
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            renameAll(tempRoot.toPath(), listOf(validInstruction, invalidInstruction))
+        }
+
+        // Original files should be restored
+        assertTrue(accessFile.exists(), "Access file should be rolled back")
+        assertTrue(primaryFile.exists(), "Primary file should be rolled back")
+        assertEquals("access-content", accessFile.readText(), "Access file content should be intact")
+        assertEquals("primary-content", primaryFile.readText(), "Primary file content should be intact")
+
+        // Renamed files should NOT exist
+        assertFalse(File(accessFile.parent, "${itemId}_00002.jp2").exists(), "Renamed access file should not exist")
+        assertFalse(File(primaryFile.parent, "${itemId}_00002.jp2").exists(), "Renamed primary file should not exist")
+    }
+
+    @Test
+    fun `renameAll cleans up temporary directory on rollback`() {
+        val invalidInstruction = RenameInstruction(
+            originalName = "invalid-original",
+            newName = "invalid-new"
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            renameAll(tempRoot.toPath(), listOf(invalidInstruction))
+        }
+
+        val tempDirs = tempRoot.listFiles { file ->
+            file.isDirectory && file.name.startsWith("temp_conflicts_")
+        }
+        assertTrue(tempDirs.isNullOrEmpty(), "Temporary directory should be cleaned up after rollback")
+    }
+
+    @Test
+    fun `renameAll throws on path traversal attempt`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            renameAll(
+                tempRoot.toPath(), listOf(
+                    RenameInstruction(
+                        originalName = "tekst_abc123_00001.jp2",
+                        newName = "../outside_00001.jp2"
+                    )
+                )
+            )
+        }
+    }
 }

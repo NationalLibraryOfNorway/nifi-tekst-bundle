@@ -6,7 +6,6 @@ import no.nb.models.RenameInstruction
 import no.nb.utils.RenameUtils
 import no.nb.utils.RenameUtils.renameAll
 import no.nb.utils.UUIDv7.randomUUID
-import org.apache.nifi.annotation.behavior.DynamicProperty
 import org.apache.nifi.annotation.behavior.SideEffectFree
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
 import org.apache.nifi.annotation.documentation.CapabilityDescription
@@ -24,12 +23,6 @@ import java.nio.file.Path
 import java.util.*
 
 @SupportsSensitiveDynamicProperties
-@DynamicProperty(
-    name = "",
-    value = "",
-    description = "",
-    expressionLanguageScope = ExpressionLanguageScope.FLOWFILE_ATTRIBUTES
-)
 @Tags("NB", "Tekst", "Text", "Order", "Files")
 @CapabilityDescription(
     "A nifi processor that reorders/renames files in access and primary folders"
