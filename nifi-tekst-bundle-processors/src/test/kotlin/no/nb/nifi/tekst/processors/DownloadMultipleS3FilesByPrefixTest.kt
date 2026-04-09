@@ -5,12 +5,15 @@ import io.minio.MinioClient
 import io.minio.UploadObjectArgs
 import org.apache.nifi.util.TestRunners
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.utility.DockerImageName
 import java.io.File
-import java.nio.file.Paths
+import java.nio.file.Path
 
 
 class DownloadMultipleS3FilesByPrefixTest {
@@ -62,14 +65,14 @@ class DownloadMultipleS3FilesByPrefixTest {
             minioClient.uploadObject(
                 UploadObjectArgs.builder()
                     .bucket(BUCKET)
-                    .`object`("NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23/representations/primary/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
+                    .`object`("NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23/representations/primary/data/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
                     .filename("src/test/resources/S3-data/logos/NB-logo-no-hvit.png")
                     .build()
             )
             minioClient.uploadObject(
                 UploadObjectArgs.builder()
                     .bucket(BUCKET)
-                    .`object`("NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23/representations/access/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
+                    .`object`("NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23/representations/access/data/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
                     .filename("src/test/resources/S3-data/logos/NB-logo-no-hvit.png")
                     .build()
             )
@@ -97,7 +100,7 @@ class DownloadMultipleS3FilesByPrefixTest {
     }
 
     @Test
-    fun listFilesAndDownloadFilesAccessAndPrimary() {
+    fun listFilesAndDownloadFilesAccessAndPrimary(@TempDir tempDir: Path) {
         val runner = TestRunners.newTestRunner(DownloadMultipleS3FilesByPrefix::class.java)
         runner.setProperty(DownloadMultipleS3FilesByPrefix.BUCKET, BUCKET)
         runner.setProperty(DownloadMultipleS3FilesByPrefix.ACCESS_KEY, ACCESS_KEY)
@@ -106,43 +109,31 @@ class DownloadMultipleS3FilesByPrefixTest {
         runner.setProperty(DownloadMultipleS3FilesByPrefix.PREFIX, "NEWSPAPER/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23")
         runner.setProperty(DownloadMultipleS3FilesByPrefix.ENDPOINT, minioServerUrl)
 
-        val projectFolder = Paths.get("").toAbsolutePath().toString()
-        val downloadedFilesFolder = "src/test/resources/downloaded-files"
-
-        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, "$projectFolder/$downloadedFilesFolder")
+        val downloadDir = tempDir.toAbsolutePath().toString()
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, downloadDir)
 
         runner.enqueue("Hello world")
 
         runner.run()
 
-        // check that the files are downloaded
-        val downloadedFiles = File(downloadedFilesFolder).listFiles()
-        val representationFile = downloadedFiles!![0].listFiles()
-        val accessFile = representationFile!![0].listFiles()!![0]
-        val primaryFile = representationFile[1].listFiles()!![0]
+        // check that the files are downloaded - find by name rather than relying on listFiles() order
+        val downloadedFilesDir = tempDir.toFile()
+        val representationsDir = File(downloadedFilesDir, "representations")
+        val accessDir = File(representationsDir, "access/data")
+        val primaryDir = File(representationsDir, "primary/data")
+        val accessFile = File(accessDir, "tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
+        val primaryFile = File(primaryDir, "tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
 
-        assert(accessFile.exists())
-        assert(accessFile.path.endsWith("$downloadedFilesFolder/representations/access/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png"))
-        assert(primaryFile.exists())
-        assert(primaryFile.path.endsWith("$downloadedFilesFolder/representations/primary/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png"))
+        assertTrue(accessFile.exists()) { "Access file should exist at ${accessFile.path}" }
+        assertTrue(accessFile.path.endsWith("representations/access/data/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png"))
+        assertTrue(primaryFile.exists()) { "Primary file should exist at ${primaryFile.path}" }
+        assertTrue(primaryFile.path.endsWith("representations/primary/data/tekst_143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png"))
         runner.assertAllFlowFilesTransferred("success")
-
-        // clean up
-        cleanUpDownloadedFiles(downloadedFiles)
-        File(downloadedFilesFolder).delete()
-    }
-
-    fun cleanUpDownloadedFiles(files: Array<File>) {
-        files.forEach { file ->
-            val subFiles = file.listFiles()
-            if (subFiles !== null)
-                cleanUpDownloadedFiles(subFiles)
-            file.delete()
-        }
+        // cleanup handled automatically by @TempDir
     }
 
     @Test
-    fun listFilesAndDownloadFiles() {
+    fun listFilesAndDownloadFiles(@TempDir tempDir: Path) {
         val runner = TestRunners.newTestRunner(DownloadMultipleS3FilesByPrefix::class.java)
         runner.setProperty(DownloadMultipleS3FilesByPrefix.BUCKET, BUCKET)
         runner.setProperty(DownloadMultipleS3FilesByPrefix.ACCESS_KEY, ACCESS_KEY)
@@ -151,29 +142,24 @@ class DownloadMultipleS3FilesByPrefixTest {
         runner.setProperty(DownloadMultipleS3FilesByPrefix.PREFIX, "NEWSPAPER/143aef46-9abd-11ef-a03f-fddd5c381f23")
         runner.setProperty(DownloadMultipleS3FilesByPrefix.ENDPOINT, minioServerUrl)
 
-        val projectFolder = Paths.get("").toAbsolutePath().toString()
-        val downloadedFilesFolder = "src/test/resources/downloaded-files"
-
-        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, "$projectFolder/$downloadedFilesFolder")
+        val downloadDir = tempDir.toAbsolutePath().toString()
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, downloadDir)
 
         runner.enqueue("Hello world")
 
         runner.run()
 
         // check that the files are downloaded
-        val downloadedFiles = File(downloadedFilesFolder).listFiles()
-        assert(downloadedFiles?.size == 1)
-        assert(downloadedFiles?.get(0)?.name == "143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
+        val downloadedFile = File(tempDir.toFile(), "143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png")
+        assertTrue(downloadedFile.exists()) { "Downloaded file should exist at ${downloadedFile.path}" }
+        assertEquals("143aef46-9abd-11ef-a03f-fddd5c381f23_0001.png", downloadedFile.name)
 
         runner.assertAllFlowFilesTransferred("success")
-
-        // clean up
-        downloadedFiles?.forEach { it.delete() }
-        File(downloadedFilesFolder).delete()
+        // cleanup handled automatically by @TempDir
     }
 
     @Test
-    fun shouldFailWhenObjectDoesNotExist() {
+    fun shouldFailWhenObjectDoesNotExist(@TempDir tempDir: Path) {
         val runner = TestRunners.newTestRunner(DownloadMultipleS3FilesByPrefix::class.java)
         runner.setProperty(DownloadMultipleS3FilesByPrefix.BUCKET, BUCKET)
         runner.setProperty(DownloadMultipleS3FilesByPrefix.ACCESS_KEY, ACCESS_KEY)
@@ -182,19 +168,15 @@ class DownloadMultipleS3FilesByPrefixTest {
         runner.setProperty(DownloadMultipleS3FilesByPrefix.PREFIX, "NEWSPAPER/abc")
         runner.setProperty(DownloadMultipleS3FilesByPrefix.ENDPOINT, minioServerUrl)
 
-        val projectFolder = Paths.get("").toAbsolutePath().toString()
-        val downloadedFilesFolder = "src/test/resources/downloaded-files"
-
-        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, "$projectFolder/$downloadedFilesFolder")
+        val downloadDir = tempDir.toAbsolutePath().toString()
+        runner.setProperty(DownloadMultipleS3FilesByPrefix.LOCAL_FOLDER, downloadDir)
 
         runner.enqueue("Hello world")
 
         runner.run()
         
         runner.assertAllFlowFilesTransferred("failure")
-
-        // clean up
-        File(downloadedFilesFolder).delete()
+        // cleanup handled automatically by @TempDir
     }
 
 }

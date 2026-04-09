@@ -197,7 +197,7 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
     private fun listItemsByPrefix(
         bucket: String,
         prefix: String
-    ): MutableIterable<io.minio.Result<Item>>? {
+    ): MutableIterable<Result<Item>>? {
         return client.listObjects(
             ListObjectsArgs
                 .builder()
@@ -213,8 +213,9 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
         prefix: String,
         localFolder: String
     ) {
-        val items: List<io.minio.Result<Item>>? =
-            listItemsByPrefix(bucket, addTrailingSlashIfNotPresent(prefix))
+        val prefixWithSlash = addTrailingSlashIfNotPresent(prefix)
+        val items: List<Result<Item>>? =
+            listItemsByPrefix(bucket, prefixWithSlash)
                 ?.filter { result -> result.get().objectName().last() != '/' } // Filter out "folders" that lists out as objects.
         if (items == null || !items.iterator().hasNext()) {
             logger.error("No items found in bucket $bucket with prefix $prefix")
@@ -230,17 +231,26 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
             throw RuntimeException(e)
         }
 
-        items.forEach { mainItem: io.minio.Result<Item> ->
+        val normalizedLocalFolder = Paths.get(localFolder).normalize().toAbsolutePath()
+
+        items.forEach { mainItem: Result<Item> ->
             try {
                 val objectName: String = mainItem.get().objectName()
                 logger.info("Downloading file $objectName")
 
-                val relativeS3Path = objectName.substringAfterLast(prefix)
-                // Create directory if it does not exist - nio method does not throw if it exists
+                val relativeS3Path = objectName.removePrefix(prefixWithSlash)
+                val destinationPath = normalizedLocalFolder.resolve(relativeS3Path).normalize()
+
+                // Prevent path traversal attacks - ensure destination stays within localFolder
+                if (!destinationPath.startsWith(normalizedLocalFolder)) {
+                    logger.error("Path traversal attempt detected for object: $objectName")
+                    throw SecurityException("Path traversal attempt detected: resolved path is outside the target directory")
+                }
+
+                // Create parent directory if it does not exist - nio method does not throw if it exists
                 try {
-                    val path = Paths.get(localFolder + '/' + relativeS3Path.substringBeforeLast('/'))
-                    Files.createDirectories(path)
-                    logger.info("Downloading to $path")
+                    destinationPath.parent?.let { Files.createDirectories(it) }
+                    logger.info("Downloading to $destinationPath")
                 } catch (e: IOException) {
                     throw RuntimeException(e)
                 }
@@ -250,7 +260,7 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
                         .builder()
                         .bucket(bucket)
                         .`object`(objectName)
-                        .filename("$localFolder/$relativeS3Path")
+                        .filename(destinationPath.toString())
                         .build()
                 )
 
