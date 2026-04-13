@@ -18,9 +18,9 @@ class RegenerateMetsFilesTest {
     private val projectFolder = Paths.get("").toAbsolutePath().toString()
     private val tekstUuid = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72"
     private val tekstFolder = "$projectFolder/src/test/resources/$tekstUuid"
-    private val altoFolder = "$tekstFolder/access/metadata/other/ocr"
-    private val imageFolder = "$tekstFolder/access/data"
-    private val jhoveFolder = "$tekstFolder/access/metadata/technical/jhove"
+    private val altoFolder = "$tekstFolder/representations/access/metadata/other/ocr"
+    private val imageFolder = "$tekstFolder/representations/access/data"
+    private val jhoveFolder = "$tekstFolder/representations/access/metadata/technical/jhove"
 
     @Test
     @Disabled("Run manually to regenerate METS2 file")
@@ -83,7 +83,7 @@ class RegenerateMetsFilesTest {
         )
 
         // Write to test resources
-        val outputFile = File("$projectFolder/src/test/resources/${tekstUuid}-METS2_BROWSING.xml")
+        val outputFile = File("$projectFolder/src/test/resources/${tekstUuid}/${tekstUuid}-METS2_BROWSING.xml")
         outputFile.writeText(metsXml)
 
         println("Generated METS v2 + MIX v2.0 file: ${outputFile.absolutePath}")
@@ -125,7 +125,7 @@ class RegenerateMetsFilesTest {
             val height = xPath.evaluate(heightExpr, doc)?.toIntOrNull() ?: 3387
 
             return ImageResolution(width = width, height = height)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             println("Failed to parse JHOVE file: ${jhoveFile.absolutePath}")
             return ImageResolution(width = 2127, height = 3387)
         }

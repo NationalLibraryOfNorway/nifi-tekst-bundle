@@ -22,6 +22,7 @@ object XsdValidator {
     private const val MIX2_XSD_RESOURCE = "/xsd/mix20.xsd"
     private const val XLINK_XSD_RESOURCE = "/xsd/xlink.xsd"
     private const val JHOVE_XSD_RESOURCE = "/xsd/jhove.xsd"
+    private const val ALTO_XSD_RESOURCE = "/xsd/alto-1-2.xsd"
 
     /**
      * Custom resource resolver that maps remote XSD URLs to local classpath resources.
@@ -38,7 +39,9 @@ object XsdValidator {
             "https://schema.openpreservation.org/ois/xml/xsd/jhove/1.10/jhove.xsd" to JHOVE_XSD_RESOURCE,
             "http://schema.openpreservation.org/ois/xml/xsd/jhove/1.10/jhove.xsd" to JHOVE_XSD_RESOURCE,
             "https://schema.openpreservation.org/ois/xml/xsd/jhove/1.8/jhove.xsd" to JHOVE_XSD_RESOURCE,
-            "http://schema.openpreservation.org/ois/xml/xsd/jhove/1.8/jhove.xsd" to JHOVE_XSD_RESOURCE
+            "http://schema.openpreservation.org/ois/xml/xsd/jhove/1.8/jhove.xsd" to JHOVE_XSD_RESOURCE,
+            "http://schema.ccs-gmbh.com/metae/alto-1-2.xsd" to ALTO_XSD_RESOURCE,
+            "http://schema.ccs-gmbh.com/METAe/xlink.xsd" to XLINK_XSD_RESOURCE
         )
 
         override fun resolveResource(
@@ -139,6 +142,24 @@ object XsdValidator {
      */
     fun validateJhove(xmlContent: String): ValidationResult {
         return validate(xmlContent, listOf(JHOVE_XSD_RESOURCE))
+    }
+
+    /**
+     * Validates an XML file against the ALTO 1.2 schema.
+     * @param xmlFile The XML file to validate
+     * @return ValidationResult with success status and any error messages
+     */
+    fun validateAlto(xmlFile: File): ValidationResult {
+        return validateAlto(xmlFile.readText())
+    }
+
+    /**
+     * Validates XML content against the ALTO 1.2 schema.
+     * @param xmlContent The XML content to validate
+     * @return ValidationResult with success status and any error messages
+     */
+    fun validateAlto(xmlContent: String): ValidationResult {
+        return validate(xmlContent, listOf(ALTO_XSD_RESOURCE))
     }
 
     /**

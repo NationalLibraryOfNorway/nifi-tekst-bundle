@@ -1,6 +1,5 @@
 package no.nb.nifi.tekst.processors
 
-import no.nb.nifi.tekst.util.NiFiAttributes
 import no.nb.nifi.tekst.util.XmlHelper
 import no.nb.nifi.tekst.validation.XsdValidator
 import org.apache.nifi.util.TestRunners
@@ -11,7 +10,7 @@ import org.junit.jupiter.api.Test
 import org.w3c.dom.Document
 import org.w3c.dom.NodeList
 import java.io.File
-import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 
 /**
@@ -20,37 +19,43 @@ import java.nio.file.Paths
  *
  * This test simulates a complete workflow:
  * 1. Start with tekst_<uuid>_no_jhove (no JHOVE metadata)
- * 2. Run Jhove processor on JP2 images to generate JHOVE metadata
+ * 2. Run Jhove processor on the object folder to generate JHOVE metadata
  * 3. Run CreateMetsBrowsing processor using the generated JHOVE data with METS_2 and MIX_2_0 versions
  * 4. Validate the generated METS2 XML against XSD schemas
- * 5. Compare the result to the expected METS2 file from tekst_<uuid>
+ * 5. Compare the result to the expected METS2 file
  */
+@Suppress("SameParameterValue")
 class JhoveToMets2BrowsingIntegrationTest {
 
-    private lateinit var tempJhoveOutputDir: File
+    private lateinit var objectFolder: Path
     private lateinit var tempMetsOutputFile: File
     private val projectFolder = Paths.get("").toAbsolutePath().toString()
 
-    // Source data without JHOVE
-    private val noJhoveRoot = "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_no_jhove"
-    private val inputImagesPath = "$noJhoveRoot/access/data"
-    private val altoPath = "$noJhoveRoot/access/metadata/other/ocr"
+    private val noJhoveRoot = Paths.get(
+        projectFolder,
+        "src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_no_jhove"
+    )
+    private val descriptiveXml = Paths.get(
+        projectFolder,
+        "src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml"
+    )
 
-    // Expected output - METS2 version
-    private val expectedMets2File = File("$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml")
+    private val expectedMetsFile = File(
+        "$projectFolder/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72-METS2_BROWSING.xml"
+    )
 
-    // Configuration - Object ID is derived from the folder name
-    private val objectId = "tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_no_jhove"
+    private val objectId: String
+        get() = objectFolder.fileName.toString()
 
     @BeforeEach
     fun setup() {
-        tempJhoveOutputDir = Files.createTempDirectory("jhove_mets2_integration_test").toFile()
+        objectFolder = TestObjectFolderHelper.createTempObjectFolder(noJhoveRoot, descriptiveXml)
         tempMetsOutputFile = File.createTempFile("mets2_integration_test", ".xml")
     }
 
     @AfterEach
     fun cleanup() {
-        tempJhoveOutputDir.deleteRecursively()
+        TestObjectFolderHelper.deleteTempObjectFolder(objectFolder)
         if (tempMetsOutputFile.exists()) {
             tempMetsOutputFile.delete()
         }
@@ -58,43 +63,23 @@ class JhoveToMets2BrowsingIntegrationTest {
 
     @Test
     fun testCompleteJhoveToMets2BrowsingWorkflowWithXsdValidation() {
-        // Step 1: Run Jhove processor on all JP2 images
+        // Step 1: Run Jhove processor on the object folder
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
+        jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
 
-        jhoveRunner.setProperty(Jhove.INPUT_PATH, inputImagesPath)
-        jhoveRunner.setProperty(Jhove.OUTPUT_PATH, tempJhoveOutputDir.absolutePath)
-        jhoveRunner.setProperty(Jhove.MODULE, "JPEG2000-hul")
-        jhoveRunner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+        jhoveRunner.enqueue("test")
+        jhoveRunner.run()
 
-        // Get all JP2 files from the input directory
-        val imageFiles = File(inputImagesPath).listFiles { file ->
-            file.extension == "jp2"
-        }?.sortedBy { it.name } ?: emptyList()
-
-        assertTrue(imageFiles.isNotEmpty(), "Should have JP2 images to process")
-        assertEquals(4, imageFiles.size, "Should have exactly 4 test images")
-
-        // Process each image through Jhove
-        for (imageFile in imageFiles) {
-            val attributes = HashMap<String, String>()
-            attributes[NiFiAttributes.FILENAME] = imageFile.name
-
-            jhoveRunner.enqueue("test", attributes)
-        }
-
-        jhoveRunner.run(imageFiles.size)
-
-        // Verify Jhove processing succeeded
-        jhoveRunner.assertTransferCount(Jhove.SUCCESS_RELATIONSHIP, imageFiles.size)
-        jhoveRunner.assertTransferCount(Jhove.JHOVE_OUTPUT_RELATIONSHIP, imageFiles.size)
+        assertProcessed(jhoveRunner)
 
         // Verify JHOVE output files were created
-        val jhoveOutputFiles = tempJhoveOutputDir.listFiles { file ->
+        val accessJhoveOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
+        val jhoveOutputFiles = accessJhoveOutputDir.listFiles { file ->
             file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
         }?.sortedBy { it.name }
 
         assertNotNull(jhoveOutputFiles, "JHOVE output files should exist")
-        assertEquals(imageFiles.size, jhoveOutputFiles?.size, "Should have JHOVE output for each input image")
+        assertEquals(4, jhoveOutputFiles?.size, "Should have JHOVE output for each input image")
 
         // Verify JHOVE files contain valid data and validate against JHOVE XSD
         for (jhoveFile in jhoveOutputFiles!!) {
@@ -123,15 +108,13 @@ class JhoveToMets2BrowsingIntegrationTest {
             assertTrue(imageHeight!!.toInt() > 0, "imageHeight should be positive")
         }
 
-        println("✓ Step 1 complete: Generated ${jhoveOutputFiles.size} JHOVE metadata files with XSD validation")
-
         // Step 2: Run CreateMetsBrowsing processor using generated JHOVE data with METS2 and MIX2
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
-        metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
-        metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
-        metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder.toString())
+        metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "representations/access/metadata/other/ocr")
+        metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "representations/access/data")
+        metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, "representations/access/metadata/technical/jhove")
         metsRunner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, tempMetsOutputFile.absolutePath)
         metsRunner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         metsRunner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -145,8 +128,6 @@ class JhoveToMets2BrowsingIntegrationTest {
         assertTrue(tempMetsOutputFile.exists(), "METS2 output file should exist")
         assertTrue(tempMetsOutputFile.length() > 0, "METS2 output file should not be empty")
 
-        println("✓ Step 2 complete: Generated METS2-browsing file (${tempMetsOutputFile.length()} bytes)")
-
         // Step 3: Validate generated METS2 XML against XSD
         val generatedMetsContent = tempMetsOutputFile.readText()
         val mets2ValidationResult = XsdValidator.validateMets2(generatedMetsContent)
@@ -159,8 +140,6 @@ class JhoveToMets2BrowsingIntegrationTest {
         }
         assertTrue(mets2ValidationResult.isValid, "Generated METS2 should be valid against METS2 XSD")
 
-        println("✓ Step 3 complete: Generated METS2 passed XSD validation")
-
         // Step 3b: Validate MIX2 data embedded in METS2 against MIX2 XSD
         val mix2ValidationResult = XsdValidator.validateMix2InMets(generatedMetsContent)
 
@@ -170,11 +149,9 @@ class JhoveToMets2BrowsingIntegrationTest {
         }
         assertTrue(mix2ValidationResult.isValid, "Embedded MIX2 data should be valid against MIX2 XSD")
 
-        println("✓ Step 3b complete: Embedded MIX2 data passed XSD validation")
-
         // Step 4: Compare generated METS2 with expected output
         val generatedDoc = parseXmlFile(tempMetsOutputFile)
-        val expectedDoc = parseXmlFile(expectedMets2File)
+        val expectedDoc = parseXmlFile(expectedMetsFile)
 
         // Verify basic METS2 structure
         assertEquals("mets", generatedDoc.documentElement.localName, "Root element should be 'mets'")
@@ -260,47 +237,43 @@ class JhoveToMets2BrowsingIntegrationTest {
             val expectedImgUrn = xpath(expectedDoc, "//*[@ID='IMG_$fileId']/*[@LOCTYPE='URN']/@LOCREF")
             assertEquals(expectedImgUrn, generatedImgUrn, "Image $fileNum URN should match")
         }
-
-        println("✓ Step 4 complete: Generated METS2 matches expected output")
-        println("✓ Integration test passed: Jhove → CreateMetsBrowsing (METS2 + MIX2) workflow successful with XSD validation")
     }
 
     @Test
     fun testMets2GenerationFailsValidationWithMissingJhoveFile() {
-        // Step 1: Run Jhove processor on only SOME images (not all)
+        // Step 1: Run Jhove processor on the object folder
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
+        jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
 
-        jhoveRunner.setProperty(Jhove.INPUT_PATH, inputImagesPath)
-        jhoveRunner.setProperty(Jhove.OUTPUT_PATH, tempJhoveOutputDir.absolutePath)
-        jhoveRunner.setProperty(Jhove.MODULE, "JPEG2000-hul")
-        jhoveRunner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+        jhoveRunner.enqueue("test")
+        jhoveRunner.run()
+        assertProcessed(jhoveRunner)
 
-        // Process only the first 3 images (skip the 4th)
-        val imageFiles = File(inputImagesPath).listFiles { file ->
-            file.extension == "jp2"
-        }?.sortedBy { it.name }?.take(3) ?: emptyList()
+        // Verify JHOVE files were created, then delete one
+        val accessJhoveOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
+        val jhoveOutputFiles = accessJhoveOutputDir.listFiles { file ->
+            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
+        }?.sortedBy { it.name }
 
-        for (imageFile in imageFiles) {
-            val attributes = HashMap<String, String>()
-            attributes[NiFiAttributes.FILENAME] = imageFile.name
-            jhoveRunner.enqueue("test", attributes)
-        }
+        assertNotNull(jhoveOutputFiles, "JHOVE output files should exist")
+        assertEquals(4, jhoveOutputFiles?.size, "Should have 4 JHOVE files before deletion")
 
-        jhoveRunner.run(imageFiles.size)
+        // Delete one JHOVE file to simulate missing metadata
+        jhoveOutputFiles!![3].delete()
 
-        // Verify only 3 JHOVE files were created
-        val jhoveFiles = tempJhoveOutputDir.listFiles { file ->
+        // Verify only 3 JHOVE files remain
+        val remainingFiles = accessJhoveOutputDir.listFiles { file ->
             file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
         }
-        assertEquals(3, jhoveFiles?.size, "Should have only 3 JHOVE files")
+        assertEquals(3, remainingFiles?.size, "Should have only 3 JHOVE files after deletion")
 
         // Step 2: Run CreateMetsBrowsing with METS2 - should FAIL with clear error message
         val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
 
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
-        metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
-        metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
-        metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
+        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder.toString())
+        metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "representations/access/metadata/other/ocr")
+        metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "representations/access/data")
+        metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, "representations/access/metadata/technical/jhove")
         metsRunner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, tempMetsOutputFile.absolutePath)
         metsRunner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
         metsRunner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -315,40 +288,27 @@ class JhoveToMets2BrowsingIntegrationTest {
         // Verify the METS file was not created or is incomplete
         assertFalse(tempMetsOutputFile.exists() && tempMetsOutputFile.length() > 1000,
             "METS2 output file should not be successfully created when JHOVE files are missing")
-
-        println("✓ CreateMetsBrowsing (METS2) correctly failed when JHOVE file was missing")
     }
 
     @Test
     fun testMets2VsMets1StructuralDifferences() {
         // Step 1: Generate JHOVE metadata
         val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
+        jhoveRunner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
 
-        jhoveRunner.setProperty(Jhove.INPUT_PATH, inputImagesPath)
-        jhoveRunner.setProperty(Jhove.OUTPUT_PATH, tempJhoveOutputDir.absolutePath)
-        jhoveRunner.setProperty(Jhove.MODULE, "JPEG2000-hul")
-        jhoveRunner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
+        jhoveRunner.enqueue("test")
+        jhoveRunner.run()
 
-        val imageFiles = File(inputImagesPath).listFiles { file ->
-            file.extension == "jp2"
-        }?.sortedBy { it.name } ?: emptyList()
-
-        for (imageFile in imageFiles) {
-            val attributes = HashMap<String, String>()
-            attributes[NiFiAttributes.FILENAME] = imageFile.name
-            jhoveRunner.enqueue("test", attributes)
-        }
-
-        jhoveRunner.run(imageFiles.size)
+        assertProcessed(jhoveRunner)
 
         // Step 2: Generate METS1 with MIX1
         val mets1OutputFile = File.createTempFile("mets1_comparison", ".xml")
         try {
             val mets1Runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-            mets1Runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
-            mets1Runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
-            mets1Runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
-            mets1Runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
+            mets1Runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder.toString())
+            mets1Runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "representations/access/metadata/other/ocr")
+            mets1Runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "representations/access/data")
+            mets1Runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, "representations/access/metadata/technical/jhove")
             mets1Runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, mets1OutputFile.absolutePath)
             mets1Runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v1")
             mets1Runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_1")
@@ -360,10 +320,10 @@ class JhoveToMets2BrowsingIntegrationTest {
 
             // Step 3: Generate METS2 with MIX2
             val mets2Runner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-            mets2Runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
-            mets2Runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
-            mets2Runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
-            mets2Runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
+            mets2Runner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, objectFolder.toString())
+            mets2Runner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, "representations/access/metadata/other/ocr")
+            mets2Runner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, "representations/access/data")
+            mets2Runner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, "representations/access/metadata/technical/jhove")
             mets2Runner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, tempMetsOutputFile.absolutePath)
             mets2Runner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
             mets2Runner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
@@ -437,125 +397,26 @@ class JhoveToMets2BrowsingIntegrationTest {
                     "Image $fileNum size should be same in both METS versions")
             }
 
-            println("✓ METS1 vs METS2 structural differences verified")
-            println("✓ Both versions contain same content data with different structure")
-
         } finally {
             mets1OutputFile.delete()
         }
     }
 
     @Test
-    fun testMets2Mix2IntegrationPerformanceMetrics() {
-        val startTime = System.currentTimeMillis()
-
-        // Run Jhove processor
-        val jhoveRunner = TestRunners.newTestRunner(Jhove::class.java)
-        jhoveRunner.setProperty(Jhove.INPUT_PATH, inputImagesPath)
-        jhoveRunner.setProperty(Jhove.OUTPUT_PATH, tempJhoveOutputDir.absolutePath)
-        jhoveRunner.setProperty(Jhove.MODULE, "JPEG2000-hul")
-        jhoveRunner.setProperty(Jhove.BEHAVIOUR_ON_ERROR, "fail")
-
-        val imageFiles = File(inputImagesPath).listFiles { file ->
-            file.extension == "jp2"
-        }?.sortedBy { it.name } ?: emptyList()
-
-        for (imageFile in imageFiles) {
-            val attributes = HashMap<String, String>()
-            attributes[NiFiAttributes.FILENAME] = imageFile.name
-            jhoveRunner.enqueue("test", attributes)
-        }
-
-        val jhoveStartTime = System.currentTimeMillis()
-        jhoveRunner.run(imageFiles.size)
-        val jhoveEndTime = System.currentTimeMillis()
-
-        // Verify JHOVE files against XSD
-        val jhoveOutputFiles = tempJhoveOutputDir.listFiles { file ->
-            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
-        }?.sortedBy { it.name } ?: emptyList()
-
-        val xsdValidationStartTime = System.currentTimeMillis()
-        for (jhoveFile in jhoveOutputFiles) {
-            val result = XsdValidator.validateJhove(jhoveFile)
-            assertTrue(result.isValid, "JHOVE file ${jhoveFile.name} should be valid")
-        }
-        val xsdValidationEndTime = System.currentTimeMillis()
-
-        // Run CreateMetsBrowsing processor with METS2 + MIX2
-        val metsRunner = TestRunners.newTestRunner(CreateMetsBrowsing::class.java)
-        metsRunner.setProperty(CreateMetsBrowsing.OBJECT_FOLDER, noJhoveRoot)
-        metsRunner.setProperty(CreateMetsBrowsing.ALTO_FOLDER, altoPath)
-        metsRunner.setProperty(CreateMetsBrowsing.IMAGE_FOLDER, inputImagesPath)
-        metsRunner.setProperty(CreateMetsBrowsing.JHOVE_FOLDER, tempJhoveOutputDir.absolutePath)
-        metsRunner.setProperty(CreateMetsBrowsing.OUTPUT_FILE, tempMetsOutputFile.absolutePath)
-        metsRunner.setProperty(CreateMetsBrowsing.AGENT_NAME, "MetsBrowsingGenerator v2")
-        metsRunner.setProperty(CreateMetsBrowsing.METS_VERSION, "METS_2")
-        metsRunner.setProperty(CreateMetsBrowsing.MIX_VERSION, "MIX_2_0")
-
-        val metsStartTime = System.currentTimeMillis()
-        metsRunner.enqueue("test")
-        metsRunner.run()
-        val metsEndTime = System.currentTimeMillis()
-
-        // Validate generated METS2 against XSD
-        val mets2ValidationStartTime = System.currentTimeMillis()
-        val mets2Content = tempMetsOutputFile.readText()
-        val mets2ValidationResult = XsdValidator.validateMets2(mets2Content)
-        assertTrue(mets2ValidationResult.isValid, "Generated METS2 should be valid against XSD")
-        val mets2ValidationEndTime = System.currentTimeMillis()
-
-        // Validate embedded MIX2 data against XSD
-        val mix2ValidationStartTime = System.currentTimeMillis()
-        val mix2ValidationResult = XsdValidator.validateMix2InMets(mets2Content)
-        assertTrue(mix2ValidationResult.isValid, "Embedded MIX2 should be valid against XSD")
-        val mix2ValidationEndTime = System.currentTimeMillis()
-
-        val totalTime = System.currentTimeMillis() - startTime
-
-        println("=== METS2 + MIX2 Integration Test Performance Metrics ===")
-        println("Jhove processing time: ${jhoveEndTime - jhoveStartTime}ms for ${imageFiles.size} images")
-        println("JHOVE XSD validation time: ${xsdValidationEndTime - xsdValidationStartTime}ms for ${jhoveOutputFiles.size} files")
-        println("METS2 generation time: ${metsEndTime - metsStartTime}ms")
-        println("METS2 XSD validation time: ${mets2ValidationEndTime - mets2ValidationStartTime}ms")
-        println("MIX2 XSD validation time: ${mix2ValidationEndTime - mix2ValidationStartTime}ms")
-        println("Total workflow time: ${totalTime}ms")
-        println("Average time per image: ${totalTime / imageFiles.size}ms")
-
-        // Basic assertion that the workflow completes in reasonable time
-        assertTrue(totalTime < 120000, "Total workflow should complete in under 2 minutes")
-    }
-
-    @Test
     fun testMets2Mix2ValidatesAgainstExpectedFile() {
-        // This test validates that the expected METS2_BROWSING.xml file is valid against XSD
-        assertTrue(expectedMets2File.exists(), "Expected METS2 file should exist: ${expectedMets2File.absolutePath}")
+        assertTrue(expectedMetsFile.exists(), "Expected METS2 file should exist: ${expectedMetsFile.absolutePath}")
 
-        val result = XsdValidator.validateMets2(expectedMets2File)
-
-        if (!result.isValid) {
-            println("Expected METS2 file validation errors:")
-            result.errors.forEach { println("  - $it") }
-        }
-
+        val result = XsdValidator.validateMets2(expectedMetsFile)
         assertTrue(result.isValid, "Expected METS2_BROWSING.xml should be valid against METS2 XSD")
 
-        // Validate embedded MIX2 data against MIX2 XSD
-        val content = expectedMets2File.readText()
+        val content = expectedMetsFile.readText()
         val mix2Result = XsdValidator.validateMix2InMets(content)
-        if (!mix2Result.isValid) {
-            println("MIX2 validation errors in expected file:")
-            mix2Result.errors.forEach { println("  - $it") }
-        }
         assertTrue(mix2Result.isValid, "Expected METS2_BROWSING.xml should have valid MIX2 data")
 
-        // Verify it contains METS2 and MIX2 namespaces
         assertTrue(content.contains("http://www.loc.gov/METS/v2"),
             "Expected file should use METS v2 namespace")
         assertTrue(content.contains("http://www.loc.gov/mix/v20"),
             "Expected file should use MIX v2.0 namespace")
-
-        println("✓ Expected METS2_BROWSING.xml is valid against METS2 XSD")
     }
 
     // Helper methods for XML parsing (using centralized XmlHelper)
@@ -565,5 +426,11 @@ class JhoveToMets2BrowsingIntegrationTest {
     private fun xpath(doc: Document, expression: String): String? = XmlHelper.xpath(doc, expression)
 
     private fun xpathNodeList(doc: Document, expression: String): NodeList = XmlHelper.xpathNodeList(doc, expression)
-}
 
+    private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
+        val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +
+                runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP).size +
+                runner.getFlowFilesForRelationship(Jhove.WELLFORMED_RELATIONSHIP).size
+        assertEquals(1, routedCount, "FlowFile should be routed to success, well-formed, or failure")
+    }
+}

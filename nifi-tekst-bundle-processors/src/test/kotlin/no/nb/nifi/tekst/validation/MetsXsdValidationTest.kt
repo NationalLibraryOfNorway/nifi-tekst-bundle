@@ -21,7 +21,7 @@ class MetsXsdValidationTest {
 
     @Test
     fun `validate expected METS-browsing file against XSD`() {
-        val metsFile = File("$testResourcesPath/$tekstUuid-METS_BROWSING.xml")
+        val metsFile = File("$testResourcesPath/$tekstUuid/$tekstUuid-METS_BROWSING.xml")
         assertTrue(metsFile.exists(), "Expected METS file should exist: ${metsFile.absolutePath}")
 
         val result = XsdValidator.validateMets(metsFile)
@@ -141,7 +141,7 @@ class MetsXsdValidationTest {
         // and NOT METS v2 (http://www.loc.gov/METS/v2).
         // METS 2 validation will fail because of namespace mismatch.
 
-        val metsFile = File("$testResourcesPath/$tekstUuid-METS_BROWSING.xml")
+        val metsFile = File("$testResourcesPath/$tekstUuid/$tekstUuid-METS_BROWSING.xml")
         assertTrue(metsFile.exists(), "Expected METS file should exist")
 
         // Should pass METS v1 validation
@@ -187,7 +187,7 @@ class MetsXsdValidationTest {
 
     @Test
     fun `validate METS2_BROWSING file against METS 2 XSD`() {
-        val mets2File = File("$testResourcesPath/$tekstUuid-METS2_BROWSING.xml")
+        val mets2File = File("$testResourcesPath/$tekstUuid/$tekstUuid-METS2_BROWSING.xml")
         assertTrue(mets2File.exists(), "METS2_BROWSING file should exist: ${mets2File.absolutePath}")
 
         val result = XsdValidator.validateMets2(mets2File)

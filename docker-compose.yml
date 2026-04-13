@@ -11,6 +11,6 @@ services:
       - NIFI_SENSITIVE_PROPS_KEY=local-dev-key-12345
     volumes:
       - ./nifi-tekst-bundle-nar/target:/opt/nifi/nifi-current/nar_extensions:ro
-      - ./nifi-tekst-bundle-processors/src/test/resources:/data/test-resources:ro
+      - ./nifi-tekst-bundle-processors/src/test/resources:/data/test-resources:rw
       - ./nifi-docker/output:/data/output
     restart: unless-stopped
