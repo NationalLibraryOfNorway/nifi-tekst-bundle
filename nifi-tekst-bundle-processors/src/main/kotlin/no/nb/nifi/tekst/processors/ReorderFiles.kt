@@ -28,7 +28,9 @@ import java.util.*
     "A nifi processor that reorders/renames files in access and primary folders"
 )
 @SideEffectFree
-class ReorderFiles : AbstractProcessor() {
+class ReorderFiles(
+    private val uuidProvider: () -> String = { randomUUID().toString() }
+): AbstractProcessor() {
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
     private var relationships: MutableSet<Relationship> = mutableSetOf()
     private val logger = LoggerFactory.getLogger(RenameUtils::class.java)
@@ -213,7 +215,7 @@ class ReorderFiles : AbstractProcessor() {
                     // Validate and resolve itemId up front in onTrigger
                     var itemId: String = change.get("itemId")?.asText()?.trim() ?: ""
                     if (itemId.isBlank() || itemId == "null") {
-                        itemId = randomUUID().toString()
+                        itemId = uuidProvider()
                     }
 
                     // Validate itemId before any use

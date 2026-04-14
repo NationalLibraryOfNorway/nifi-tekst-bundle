@@ -17,7 +17,6 @@ class RenameUtilsTest {
     private lateinit var baseDir: Path
     private lateinit var baseDirFile: File
 
-
     private val renameInstructions: List<RenameInstruction>
         get() = jsonFile["renameInstructions"].map { node ->
             RenameInstruction(
@@ -28,7 +27,7 @@ class RenameUtilsTest {
 
     @BeforeEach
     fun setUp() {
-        jsonFile = TestFileUtils.readFile("renameInstructions.json")
+        jsonFile = TestFileUtils.readJson("renameInstructions.json")
         baseDir = copyResourceDirToTemp()
         baseDirFile = baseDir.toFile()
     }
@@ -73,22 +72,29 @@ class RenameUtilsTest {
 
     @Test
     fun `renameAll using renameInstructions`() {
+        // Create the initial directory structure and files based on the renameInstructions
         renameInstructions.forEach { instruction ->
-            val folderName = instruction.originalName.substringBeforeLast('_')
-            val (accessDir, primaryDir) = getDataDirs(folderName)
-            assertTrue(File(accessDir, instruction.originalName).exists())
-            assertTrue(File(primaryDir, instruction.originalName).exists())
+            val accessFile = TestFileUtils.createFile(baseDir, "access", instruction.originalName, "access-content")
+            val primaryFile = TestFileUtils.createFile(baseDir, "primary", instruction.originalName, "primary-content")
+
+            //Verifying that the files are created
+            assertTrue(accessFile.exists(), "Access file should exist before rename")
+            assertTrue(primaryFile.exists(), "Primary file should exist before rename")
         }
+
+        //Run the renamAll function with the renameInstructions
         renameAll(baseDir, renameInstructions)
 
-        val expectedByItem = renameInstructions
+        //Group the new filenames key, example folderName: tekst_123, value: array of fileNames: [tekst_123_001.jp2, tekst_123_002.jp2]
+        val newFileNames = renameInstructions
             .groupBy { it.newName.substringBeforeLast('_') }
             .mapValues { (_, instructions) -> instructions.map { it.newName }.toSet() }
 
-        expectedByItem.forEach { (itemId, expectedNames) ->
-            val (accessDir, primaryDir) = getDataDirs(itemId)
-            assertEquals(expectedNames, accessDir.listFiles()?.map { it.name }?.toSet().orEmpty())
-            assertEquals(expectedNames, primaryDir.listFiles()?.map { it.name }?.toSet().orEmpty())
+        //Verify that the files are renamed
+        newFileNames.forEach { (folderName, newFileName) ->
+            val (accessDir, primaryDir) = getDataDirs(folderName)
+            assertEquals(newFileName, accessDir.listFiles()?.map { it.name }?.toSet().orEmpty())
+            assertEquals(newFileName, primaryDir.listFiles()?.map { it.name }?.toSet().orEmpty())
         }
     }
 
@@ -127,13 +133,13 @@ class RenameUtilsTest {
 
     @Test
     fun `renameAll rolls back all files when one instruction fails`() {
-        val itemId = "tekst_test123"
-        val accessFile = TestFileUtils.createFile(baseDir, itemId, "access", "${itemId}_00001.jp2", "access-content")
-        val primaryFile = TestFileUtils.createFile(baseDir, itemId, "primary", "${itemId}_00001.jp2", "primary-content")
+        val folderName = "tekst_test123"
+        val accessFile = TestFileUtils.createFile(baseDir,  "access", "${folderName}_00001.jp2", "access-content")
+        val primaryFile = TestFileUtils.createFile(baseDir, "primary", "${folderName}_00001.jp2", "primary-content")
 
         val validInstruction = RenameInstruction(
-            originalName = "${itemId}_00001.jp2",
-            newName = "${itemId}_00002.jp2"
+            originalName = "${folderName}_00001.jp2",
+            newName = "${folderName}_00002.jp2"
         )
         val invalidInstruction = RenameInstruction(
             originalName = "invalid-original",
@@ -151,8 +157,8 @@ class RenameUtilsTest {
         assertEquals("primary-content", primaryFile.readText(), "Primary file content should be intact")
 
         // Renamed files should NOT exist
-        assertFalse(File(accessFile.parent, "${itemId}_00002.jp2").exists(), "Renamed access file should not exist")
-        assertFalse(File(primaryFile.parent, "${itemId}_00002.jp2").exists(), "Renamed primary file should not exist")
+        assertFalse(File(accessFile.parent, "${folderName}_00002.jp2").exists(), "Renamed access file should not exist")
+        assertFalse(File(primaryFile.parent, "${folderName}_00002.jp2").exists(), "Renamed primary file should not exist")
     }
 
     @Test

@@ -8,12 +8,13 @@ import java.nio.file.Path
 object TestFileUtils {
     private val mapper = ObjectMapper()
 
-    fun createFile(baseDir: Path, itemId: String, repType: String, filename: String, content: String = "data"): File {
-        val dir = File(baseDir.toFile(), "$itemId/representations/$repType/data").apply { mkdirs() }
+    fun createFile(baseDir: Path, repType: String, filename: String, content: String = "data"): File {
+        val folderName = filename.substringBeforeLast('_')
+        val dir = File(baseDir.toFile(), "$folderName/representations/$repType/data").apply { mkdirs() }
         return File(dir, filename).apply { writeText(content) }
     }
 
-    fun readFile(fileName: String): JsonNode {
+    fun readJson(fileName: String): JsonNode {
         val resource = this::class.java.classLoader.getResource("reorder-files/$fileName")
         requireNotNull(resource) { "Resource not found" }
         val jsonContent = File(resource.toURI()).readText()

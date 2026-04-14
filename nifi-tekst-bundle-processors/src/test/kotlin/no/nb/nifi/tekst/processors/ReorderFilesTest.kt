@@ -29,7 +29,7 @@ class ReorderFilesTest {
 
     @BeforeEach
     fun setUp() {
-        flowFile = TestFileUtils.readFile("flowfile.json")
+        flowFile = TestFileUtils.readJson("flowfile.json")
         changes = flowFile["changes"]
         runner = TestRunners.newTestRunner(ReorderFiles())
         runner.setProperty(ReorderFiles.BASE_DIR, baseDir.toString())
@@ -42,35 +42,55 @@ class ReorderFilesTest {
     }
 
     @Test
-    fun `processor transforms flowfile and produces correct output JSON`() {
-        // Arrange - set up the actual files on disk that the processor will rename
+    fun `ReorderFiles processor should move and rename files correctly`() {
+        val fixedUuid = "uuid-1234"
+        val reorderFilesWithUuid = ReorderFiles(uuidProvider = { fixedUuid })
         val inputJson = mapper.writeValueAsString(flowFile)
+        val createdOcrFiles = mutableListOf<File>()
 
-        // Create the expected directory structure for each change
-        for (change in changes) {
-            var itemId = change["itemId"]?.asText()?.trim() ?: ""
-            if (itemId.isBlank() || itemId == "null") continue
-            val orderedImages = change["orderedImageIds"] ?: continue
-            orderedImages.forEach { image ->
-                val rawName = image.asText()
-                val filename = if (rawName.startsWith("tekst_")) rawName else "tekst_$rawName"
-                val jp2 = if (filename.endsWith(".jp2")) filename else "$filename.jp2"
-                TestFileUtils.createFile(baseDir, "tekst_$itemId", "access", jp2)
-                TestFileUtils.createFile(baseDir, "tekst_$itemId", "primary", jp2)
+        // Create the initial directory structure and files
+        fun createTestFilesForChange(change: JsonNode) {
+            val orderedImages = change["orderedImageIds"] ?: return
+            orderedImages.forEach { imageName ->
+                val rawName = imageName.asText()
+                val fileName = if (rawName.endsWith(".jp2")) rawName else "$rawName.jp2"
+                val accessFile = TestFileUtils.createFile(baseDir, "access", fileName)
+                val primaryFile = TestFileUtils.createFile(baseDir, "primary", fileName)
+
+                // Create ocr xml for each access file
+                val itemId = change["itemId"]?.asText() ?: fixedUuid
+                val folderName = "tekst_$itemId"
+                val ocrDir = baseDir.resolve("$folderName/representations/access/metadata/other/ocr").toFile()
+                ocrDir.mkdirs()
+                val xmlFile = File(ocrDir, "${rawName}.xml")
+                xmlFile.writeText("<xml>dummy</xml>")
+
+                //Verify that files are created
+                assertTrue(accessFile.exists(), "File should exist: ${accessFile.absolutePath}")
+                assertTrue(primaryFile.exists(), "File should exist: ${primaryFile.absolutePath}")
+                assertTrue(xmlFile.exists(), "OCR XML should exist: ${xmlFile.absolutePath}")
+                createdOcrFiles += xmlFile
             }
         }
 
+        changes.forEach { createTestFilesForChange(it) }
+
+        //Run the processor
+        runner = TestRunners.newTestRunner(reorderFilesWithUuid)
+        runner.setProperty(ReorderFiles.BASE_DIR, baseDir.toString())
+        runner.assertValid()
         runner.enqueue(inputJson.toByteArray())
         runner.run()
         runner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
 
-        // Assert output JSON structure
+        // Verify the output
         val outFlowFile = runner.getFlowFilesForRelationship(ReorderFiles.REL_SUCCESS)[0]
         val outputJson = mapper.readTree(String(outFlowFile.toByteArray()))
+        val items = outputJson["items"]
+        assertNotNull(items, "Output should contain items array")
+        assertEquals(changes.size(), items.size(), "Should have one item per change")
 
-        // Top-level fields match input
         val topLevelFields = listOf("batchId", "font", "materialType", "publicationType", "language", "digital")
-
         for (field in topLevelFields) {
             if (flowFile[field]?.isBoolean == true) {
                 assertEquals(flowFile[field]?.asBoolean(), outputJson[field]?.asBoolean(), "Field '$field' should match")
@@ -79,27 +99,38 @@ class ReorderFilesTest {
             }
         }
 
-        // Items array has one entry per change with correct page count
-        val items = outputJson["items"]
-        assertNotNull(items, "Output should contain items array")
-        assertEquals(changes.size(), items.size(), "Should have one item per change")
-
         items.forEachIndexed { index, item ->
             val change = changes[index]
             val expectedItemId = change["itemId"]?.asText()
             val expectedPages = change["orderedImageIds"]?.size() ?: 0
 
-            //Last item in flow file is a new item, so a random UUID is generated so it cannot be compared to input
-            if(expectedItemId != null) {
+            //The last item in flowFile is a new item, so a new UUID is generated, in this case a mocked value
+            if (expectedItemId != null) {
                 assertEquals(expectedItemId, item["itemId"]?.asText(), "itemId should match for item $index")
+            } else {
+                assertEquals(fixedUuid, item["itemId"]?.asText(), "itemId should match for item $index")
             }
             assertEquals(expectedPages, item["pages"]?.asInt(), "page count should match for item $index")
+        }
+
+        //Check that all files has been moved and renamed after the processor has ran
+        val resultFile = File("src/test/resources/reorder-files/reorderedPaths.txt")
+        val expectedPaths = resultFile.readLines().map { baseDir.resolve(it).normalize().toFile() }
+        expectedPaths.forEach { file ->
+            assertTrue(file.exists(), "Expected file does not exist: $file")
+        }
+
+        // Verify all ocr xml files have been deleted, but ocr folder exists
+        createdOcrFiles.forEach { xmlFile ->
+            assertTrue(!xmlFile.exists(), "OCR XML should be deleted: ${xmlFile.absolutePath}")
+            val ocrDir = xmlFile.parentFile
+            assertTrue(ocrDir.exists() && ocrDir.isDirectory, "OCR dir should still exist: ${ocrDir.absolutePath}")
         }
     }
 
     @Test
     fun `addReorderInstructions() provides the correct instructions regardless of order`() {
-        val addInstruction = TestFileUtils.readFile("addRenameInstruction.json")
+        val addInstruction = TestFileUtils.readJson("addRenameInstruction.json")
         val expected = addInstruction["addInstruction"]
         val expectedOrder = mapper.convertValue(expected, List::class.java) as List<*>
 
