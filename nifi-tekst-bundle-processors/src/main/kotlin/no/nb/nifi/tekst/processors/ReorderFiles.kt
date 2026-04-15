@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import no.nb.models.RenameInstruction
 import no.nb.utils.RenameUtils
 import no.nb.utils.RenameUtils.renameAll
-import no.nb.utils.UUIDv7.randomUUID
+import no.nb.utils.UUIDv7
 import org.apache.nifi.annotation.behavior.SideEffectFree
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
 import org.apache.nifi.annotation.documentation.CapabilityDescription
@@ -29,7 +29,7 @@ import java.util.*
 )
 @SideEffectFree
 class ReorderFiles(
-    private val uuidProvider: () -> String = { randomUUID().toString() }
+    private val uuidProvider: () -> String = { UUIDv7.randomUUID().toString() }
 ): AbstractProcessor() {
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
     private var relationships: MutableSet<Relationship> = mutableSetOf()
