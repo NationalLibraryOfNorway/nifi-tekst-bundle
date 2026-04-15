@@ -114,8 +114,25 @@ class ReorderFilesTest {
         }
 
         //Check that all files has been moved and renamed after the processor has ran
-        val resultFile = File("src/test/resources/reorder-files/reorderedPaths.txt")
-        val expectedPaths = resultFile.readLines().map { baseDir.resolve(it).normalize().toFile() }
+        val expectedPaths = listOf(
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/access/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00001.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/primary/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00001.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/access/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00002.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/primary/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00002.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/access/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00003.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/primary/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00003.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/access/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00004.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/primary/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00004.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/access/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00005.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec/representations/primary/data/tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00005.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c/representations/access/data/tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00001.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c/representations/primary/data/tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00001.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c/representations/access/data/tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00002.jp2",
+            "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c/representations/primary/data/tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00002.jp2",
+            "tekst_uuid-1234/representations/access/data/tekst_uuid-1234_00001.jp2",
+            "tekst_uuid-1234/representations/primary/data/tekst_uuid-1234_00001.jp2"
+        ).map { baseDir.resolve(it).normalize().toFile() }
+
         expectedPaths.forEach { file ->
             assertTrue(file.exists(), "Expected file does not exist: $file")
         }
