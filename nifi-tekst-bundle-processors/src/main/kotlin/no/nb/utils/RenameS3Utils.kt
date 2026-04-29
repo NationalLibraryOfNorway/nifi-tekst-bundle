@@ -11,6 +11,7 @@ import io.minio.messages.DeleteObject
 import no.nb.models.RenameInstruction
 import no.nb.utils.RenameUtils.extractIdFromFilename
 import org.slf4j.LoggerFactory
+import kotlin.text.get
 
 object RenameS3Utils {
 
@@ -176,18 +177,29 @@ object RenameS3Utils {
             return
         }
 
-        val deleteObjects = keys.map { DeleteObject(it) }
-        val results = client.removeObjects(
-            RemoveObjectsArgs.builder()
-                .bucket(bucket)
-                .objects(deleteObjects)
-                .build()
-        )
+        val allErrors = mutableListOf<String>()
 
-        // RemoveObjects is lazy — must iterate results to trigger deletion
-        results.forEach { result ->
-            val error = result.get()
-            logger.error("Failed to delete key '${error.objectName()}' from bucket '$bucket': ${error.message()}")
+        keys.chunked(1000).forEach { chunk ->
+            val deleteObjects = chunk.map { DeleteObject(it) }
+            val results = client.removeObjects(
+                RemoveObjectsArgs.builder()
+                    .bucket(bucket)
+                    .objects(deleteObjects)
+                    .build()
+            )
+            results.forEach { result ->
+                val error = result.get()
+                val msg = "'${error.objectName()}': ${error.message()}"
+                logger.error("Failed to delete key $msg from bucket '$bucket'")
+                allErrors.add(msg)
+            }
+        }
+
+        if (allErrors.isNotEmpty()) {
+            throw RuntimeException(
+                "Failed to delete ${allErrors.size} key(s) from bucket '$bucket': " +
+                        allErrors.joinToString()
+            )
         }
 
         logger.debug("Deleted ${keys.size} keys from bucket '$bucket'")

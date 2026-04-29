@@ -10,7 +10,7 @@ object S3ClientFactory {
      * Builds a MinIO client from processor properties.
      */
     fun getS3Client(accessKey: String, secretKey: String, region: String, url: String): MinioClient {
-        logger.warn("MinioClientFactory: Creating client — endpoint='{}', region='{}'", url, region)
+        logger.debug("MinioClientFactory: Creating client — endpoint='{}', region='{}'", url, region)
         return MinioClient
             .builder()
             .endpoint(url)

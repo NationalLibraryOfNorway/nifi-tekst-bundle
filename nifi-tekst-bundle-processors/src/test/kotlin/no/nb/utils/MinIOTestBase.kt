@@ -18,6 +18,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import java.io.ByteArrayInputStream
 import java.time.Duration
+import kotlin.text.get
 
 @Testcontainers
 abstract class MinIOTestBase {
@@ -76,9 +77,14 @@ abstract class MinIOTestBase {
                     .bucket(BUCKET)
                     .objects(objects)
                     .build()
-            ).mapNotNull { runCatching { it.get() }.exceptionOrNull() }
+            ).mapNotNull { result ->
+                runCatching { result.get() }.getOrNull()  // DeleteError if deletion failed
+            }
             if (errors.isNotEmpty()) {
-                throw RuntimeException("Failed to remove ${errors.size} object(s) during teardown: ${errors.first().message}")
+                throw RuntimeException(
+                    "Failed to remove ${errors.size} object(s) during teardown: " +
+                            errors.joinToString { "${it.objectName()} — ${it.message()}" }
+                )
             }
         }
     }

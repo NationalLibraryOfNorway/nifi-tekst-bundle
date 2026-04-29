@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.minio.MinioClient
 import no.nb.models.ProcessChangesResult
 import no.nb.models.RenameInstruction
-import no.nb.utils.RenameDiskUtils.renameFilsOnDisk
+import no.nb.utils.RenameDiskUtils.renameFilesOnDisk
 import no.nb.utils.RenameS3Utils.renameS3Files
 import no.nb.nifi.tekst.util.S3ClientFactory.getS3Client
 import no.nb.utils.UUIDv7
@@ -211,8 +211,13 @@ class ReorderFiles(
         val items = mutableListOf<Map<String, Any>>()
 
         for (change in changes) {
-            var itemId = change.get("itemId")?.asText()?.trim() ?: ""
-            if (itemId.isBlank() || itemId.isEmpty()) itemId = uuidProvider()
+            val itemIdNode = change.get("itemId")
+            var itemId = if (itemIdNode == null || itemIdNode.isNull) {
+                ""
+            } else {
+                itemIdNode.asText().trim()
+            }
+            if (itemId.isBlank() || itemId.equals("null", ignoreCase = true)) itemId = uuidProvider()
             require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
             itemIds.add(itemId)
 
@@ -269,7 +274,7 @@ class ReorderFiles(
                 val (renameInstructions, itemIds, items) = processChanges(changes, zeroPadding, baseDirPath)
 
                 logger.debug("Reordering {} files on disk for batchId='{}'", renameInstructions.size, batchId)
-                renameFilsOnDisk(baseDirPath, renameInstructions)
+                renameFilesOnDisk(baseDirPath, renameInstructions)
                 logger.info("Reordered {} files on disk for batchId='{}'", renameInstructions.size, batchId)
 
                 try {
@@ -281,7 +286,7 @@ class ReorderFiles(
                     val rollbackInstructions = renameInstructions.map {
                         RenameInstruction(originalName = it.newName, newName = it.originalName)
                     }
-                    renameFilsOnDisk(baseDirPath, rollbackInstructions)
+                    renameFilesOnDisk(baseDirPath, rollbackInstructions)
                     throw e
                 }
 

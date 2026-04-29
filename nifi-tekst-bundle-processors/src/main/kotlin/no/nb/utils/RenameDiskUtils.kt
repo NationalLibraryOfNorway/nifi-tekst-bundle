@@ -27,7 +27,7 @@ object RenameDiskUtils {
         }
     }
 
-    fun renameFilsOnDisk(baseDir: Path, renameInstructions: List<RenameInstruction>) {
+    fun renameFilesOnDisk(baseDir: Path, renameInstructions: List<RenameInstruction>) {
         val effectiveRenames: List<RenameInstruction> = renameInstructions.filter { it.originalName != it.newName }
         if (effectiveRenames.isEmpty()) {
             logger.debug("No effective renames to process")
