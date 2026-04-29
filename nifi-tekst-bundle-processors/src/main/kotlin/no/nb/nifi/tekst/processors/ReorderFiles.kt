@@ -81,9 +81,10 @@ class ReorderFiles(
 
         val PREFIX: PropertyDescriptor = PropertyDescriptor.Builder().name("prefix").displayName("Prefix")
             .description("Prefix (folder-like) in S3 that contains the files to download")
-            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).required(true)
+            .required(true)
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+            .build()
 
         private const val TEKST_PREFIX = "tekst_"
     }
@@ -156,7 +157,8 @@ class ReorderFiles(
             val originalName = when {
                 prefixedName.endsWith(".tif", ignoreCase = true) -> prefixedName
                 prefixedName.endsWith(".tiff", ignoreCase = true) -> prefixedName
-                else -> "$prefixedName.tif"  // default to .tif if no extension
+                prefixedName.substringAfterLast('.', prefixedName) != prefixedName -> prefixedName
+                else -> "$prefixedName.tif"  // default to .tif only if no extension
             }
             val pageNumber = String.format(zeroPadding, index + 1)
             val extension = originalName.substringAfterLast('.')
@@ -232,19 +234,19 @@ class ReorderFiles(
     override fun onTrigger(context: ProcessContext, session: ProcessSession) {
         var flowFile: FlowFile = session.get() ?: return
 
-        val bucket = context.getProperty(BUCKET).evaluateAttributeExpressions(flowFile).value
-        val accessKey = context.getProperty(ACCESS_KEY).evaluateAttributeExpressions(flowFile).value
-        val secretKey = context.getProperty(SECRET_KEY).value
-        val region = context.getProperty(REGION).evaluateAttributeExpressions(flowFile).value
-        val endpoint = context.getProperty(ENDPOINT).evaluateAttributeExpressions(flowFile).value
-        val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value.trimEnd('/')
-        val client = s3ClientProvider?.invoke(accessKey, secretKey, region, endpoint) ?: getS3Client(
-            accessKey,
-            secretKey,
-            region,
-            endpoint
-        )
         try {
+            val bucket = context.getProperty(BUCKET).evaluateAttributeExpressions(flowFile).value
+            val accessKey = context.getProperty(ACCESS_KEY).evaluateAttributeExpressions(flowFile).value
+            val secretKey = context.getProperty(SECRET_KEY).value
+            val region = context.getProperty(REGION).evaluateAttributeExpressions(flowFile).value
+            val endpoint = context.getProperty(ENDPOINT).evaluateAttributeExpressions(flowFile).value
+            val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value.trimEnd('/')
+            val client = s3ClientProvider?.invoke(accessKey, secretKey, region, endpoint) ?: getS3Client(
+                accessKey,
+                secretKey,
+                region,
+                endpoint
+            )
             val zeroPadding =
                 context.getProperty(RENAME_ZERO_PAD_STRING).evaluateAttributeExpressions(flowFile).value ?: "%05d"
             val baseDirValue = context.getProperty(BASE_DIR).evaluateAttributeExpressions(flowFile).value

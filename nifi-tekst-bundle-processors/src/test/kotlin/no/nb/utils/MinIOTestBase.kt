@@ -18,7 +18,6 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import java.io.ByteArrayInputStream
 import java.time.Duration
-import kotlin.text.get
 
 @Testcontainers
 abstract class MinIOTestBase {
@@ -31,7 +30,7 @@ abstract class MinIOTestBase {
 
         @JvmField
         @Container
-        val minioContainer: GenericContainer<*> = GenericContainer(DockerImageName.parse("minio/minio"))
+        val minioContainer: GenericContainer<*> = GenericContainer(DockerImageName.parse("minio/minio:RELEASE.2025-04-22T22-12-26Z"))
             .withExposedPorts(9000)
             .withEnv("MINIO_ROOT_USER", MINIO_USER)
             .withEnv("MINIO_ROOT_PASSWORD", MINIO_PASSWORD)
