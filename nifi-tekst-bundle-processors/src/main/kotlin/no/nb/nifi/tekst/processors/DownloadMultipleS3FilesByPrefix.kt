@@ -21,6 +21,7 @@ import io.minio.ListObjectsArgs
 import io.minio.MinioClient
 import io.minio.Result
 import io.minio.messages.Item
+import no.nb.nifi.tekst.util.S3ClientFactory.getS3Client
 import org.apache.nifi.annotation.behavior.SideEffectFree
 import org.apache.nifi.annotation.documentation.CapabilityDescription
 import org.apache.nifi.annotation.documentation.Tags
@@ -171,20 +172,6 @@ class DownloadMultipleS3FilesByPrefix : AbstractProcessor() {
         }
 
         session.transfer(flowFile, REL_SUCCESS)
-    }
-
-    private fun getS3Client(
-        accessKey: String,
-        secretKey: String,
-        region: String,
-        url: String
-    ): MinioClient {
-        return MinioClient
-            .builder()
-            .endpoint(url)
-            .region(region)
-            .credentials(accessKey, secretKey)
-            .build()
     }
 
     private fun addTrailingSlashIfNotPresent(str: String): String {

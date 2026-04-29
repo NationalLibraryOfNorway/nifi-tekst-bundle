@@ -2,7 +2,7 @@ package no.nb.utils
 
 import com.fasterxml.jackson.databind.JsonNode
 import no.nb. models.RenameInstruction
-import no.nb.utils.RenameUtils.renameAll
+import no.nb.utils.RenameDiskUtils.renameFilsOnDisk
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -11,7 +11,7 @@ import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 
-class RenameUtilsTest {
+class RenameDiskUtilsTest: MinIOTestBase() {
 
     private lateinit var jsonFile: JsonNode
     private lateinit var baseDir: Path
@@ -46,7 +46,7 @@ class RenameUtilsTest {
         val targetRoot = File(tempDir, "tmp").apply { mkdirs() }
 
         val reorderFilesUrl = requireNotNull(
-            RenameUtilsTest::class.java.classLoader.getResource("reorder-files")
+            RenameDiskUtilsTest::class.java.classLoader.getResource("reorder-files")
         ) { "reorder-files not found on classpath" }
 
         val resourceRoot = File(reorderFilesUrl.toURI())
@@ -71,7 +71,7 @@ class RenameUtilsTest {
     }
 
     @Test
-    fun `renameAll using renameInstructions`() {
+    fun `renameFilsOnDisk using renameInstructions`() {
         // Create the initial directory structure and files based on the renameInstructions
         renameInstructions.forEach { instruction ->
             val accessFile = TestFileUtils.createFile(baseDir, "access", instruction.originalName, "access-content")
@@ -83,7 +83,7 @@ class RenameUtilsTest {
         }
 
         //Run the renamAll function with the renameInstructions
-        renameAll(baseDir, renameInstructions)
+        renameFilsOnDisk(baseDir, renameInstructions)
 
         //Group the new filenames key, example folderName: tekst_123, value: array of fileNames: [tekst_123_001.jp2, tekst_123_002.jp2]
         val newFileNames = renameInstructions
@@ -99,7 +99,7 @@ class RenameUtilsTest {
     }
 
     @Test
-    fun `renameAll does nothing when originalName equals newName`() {
+    fun `renameFilsOnDisk does nothing when originalName equals newName`() {
         // Get similar instructions
         val similarInstructions: List<RenameInstruction> = renameInstructions.filter { it.originalName == it.newName }
 
@@ -109,7 +109,7 @@ class RenameUtilsTest {
             .map { it.relativeTo(baseDirFile).path }
             .toSet()
 
-        renameAll(baseDir, similarInstructions)
+        renameFilsOnDisk(baseDir, similarInstructions)
 
         // Capture post-state
         val postState = baseDirFile.walkTopDown()
@@ -121,8 +121,8 @@ class RenameUtilsTest {
     }
 
     @Test
-    fun `renameAll cleans up temporary directory on success`() {
-        renameAll(baseDir, renameInstructions)
+    fun `renameFilsOnDisk cleans up temporary directory on success`() {
+        renameFilsOnDisk(baseDir, renameInstructions)
 
         // Assert no temp_conflicts_ directory remains
         val tempDirs = baseDirFile.listFiles { file ->
@@ -132,7 +132,7 @@ class RenameUtilsTest {
     }
 
     @Test
-    fun `renameAll rolls back all files when one instruction fails`() {
+    fun `renameFilsOnDisk rolls back all files when one instruction fails`() {
         val folderName = "tekst_test123"
         val accessFile = TestFileUtils.createFile(baseDir,  "access", "${folderName}_00001.jp2", "access-content")
         val primaryFile = TestFileUtils.createFile(baseDir, "primary", "${folderName}_00001.jp2", "primary-content")
@@ -147,7 +147,7 @@ class RenameUtilsTest {
         )
 
         assertThrows(IllegalArgumentException::class.java) {
-            renameAll(baseDir, listOf(validInstruction, invalidInstruction))
+            renameFilsOnDisk(baseDir, listOf(validInstruction, invalidInstruction))
         }
 
         // Original files should be restored
@@ -162,14 +162,14 @@ class RenameUtilsTest {
     }
 
     @Test
-    fun `renameAll cleans up temporary directory on rollback`() {
+    fun `renameFilsOnDisk cleans up temporary directory on rollback`() {
         val invalidInstruction = RenameInstruction(
             originalName = "invalid-original",
             newName = "invalid-new"
         )
 
         assertThrows(IllegalArgumentException::class.java) {
-            renameAll(baseDir, listOf(invalidInstruction))
+            renameFilsOnDisk(baseDir, listOf(invalidInstruction))
         }
 
         val tempDirs = baseDirFile.listFiles { file ->
@@ -179,9 +179,9 @@ class RenameUtilsTest {
     }
 
     @Test
-    fun `renameAll throws on path traversal attempt`() {
+    fun `renameFilsOnDisk throws on path traversal attempt`() {
         assertThrows(IllegalArgumentException::class.java) {
-            renameAll(
+            renameFilsOnDisk(
                 baseDir, listOf(
                     RenameInstruction(
                         originalName = "tekst_abc123_00001.jp2",

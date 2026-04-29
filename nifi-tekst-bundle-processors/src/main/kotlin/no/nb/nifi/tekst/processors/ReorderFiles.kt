@@ -2,11 +2,13 @@ package no.nb.nifi.tekst.processors
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.minio.MinioClient
+import no.nb.models.ProcessChangesResult
 import no.nb.models.RenameInstruction
-import no.nb.utils.RenameUtils
-import no.nb.utils.RenameUtils.renameAll
+import no.nb.utils.RenameDiskUtils.renameFilsOnDisk
+import no.nb.utils.RenameS3Utils.renameS3Files
+import no.nb.nifi.tekst.util.S3ClientFactory.getS3Client
 import no.nb.utils.UUIDv7
-import org.apache.nifi.annotation.behavior.SideEffectFree
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
 import org.apache.nifi.annotation.documentation.CapabilityDescription
 import org.apache.nifi.annotation.documentation.Tags
@@ -16,7 +18,6 @@ import org.apache.nifi.flowfile.FlowFile
 import org.apache.nifi.processor.*
 import org.apache.nifi.processor.exception.ProcessException
 import org.apache.nifi.processor.util.StandardValidators
-import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
@@ -27,43 +28,62 @@ import java.util.*
 @CapabilityDescription(
     "A nifi processor that reorders/renames files in access and primary folders"
 )
-@SideEffectFree
+
 class ReorderFiles(
-    private val uuidProvider: () -> String = { UUIDv7.randomUUID().toString() }
-): AbstractProcessor() {
+    private val uuidProvider: () -> String = { UUIDv7.randomUUID().toString() },
+    private val s3ClientProvider: ((accessKey: String, secretKey: String, region: String, endpoint: String) -> MinioClient)? = null
+) : AbstractProcessor() {
+
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
     private var relationships: MutableSet<Relationship> = mutableSetOf()
-    private val logger = LoggerFactory.getLogger(RenameUtils::class.java)
 
     companion object {
-        val BASE_DIR: PropertyDescriptor = PropertyDescriptor.Builder()
-            .name("base_dir")
-            .displayName("Base Directory")
-            .description("Base directory for renaming files. Supports Expression Language.")
-            .required(true)
+        private val mapper = ObjectMapper()
+        val BASE_DIR: PropertyDescriptor = PropertyDescriptor.Builder().name("base_dir").displayName("Base Directory")
+            .description("Base directory for renaming files. Supports Expression Language.").required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-            .build()
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
 
-        val RENAME_ZERO_PAD_STRING: PropertyDescriptor = PropertyDescriptor.Builder()
-            .name("rename_zero_pad_string")
-            .displayName("Zero pad string")
-            .description("Format string to use for zero-padded numbers (e.g. '%05d').")
-            .required(true)
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-            .defaultValue("%05d")
-            .build()
+        val RENAME_ZERO_PAD_STRING: PropertyDescriptor =
+            PropertyDescriptor.Builder().name("rename_zero_pad_string").displayName("Zero pad string")
+                .description("Format string to use for zero-padded numbers (e.g. '%05d').").required(true)
+                .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).defaultValue("%05d").build()
 
-        val REL_SUCCESS: Relationship = Relationship.Builder()
-            .description("Successfully generated JSON")
-            .name("success")
-            .build()
+        val REL_SUCCESS: Relationship =
+            Relationship.Builder().description("Successfully generated JSON").name("success").build()
 
-        val REL_FAILURE: Relationship = Relationship.Builder()
-            .description("Failed processing")
-            .name("failure")
-            .build()
+        val REL_FAILURE: Relationship = Relationship.Builder().description("Failed processing").name("failure").build()
+
+        val BUCKET: PropertyDescriptor =
+            PropertyDescriptor.Builder().name("bucket").displayName("S3 bucket").description("S3 bucket name")
+                .required(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+
+        val ACCESS_KEY: PropertyDescriptor =
+            PropertyDescriptor.Builder().name("access_key").displayName("S3 access key").description("S3 access key")
+                .required(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+
+        val SECRET_KEY: PropertyDescriptor =
+            PropertyDescriptor.Builder().name("secret_key").displayName("S3 secret key").description("S3 secret key")
+                .required(true).sensitive(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR).build()
+
+        val REGION: PropertyDescriptor =
+            PropertyDescriptor.Builder().name("region").displayName("S3 region").description("S3 region").required(true)
+                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+
+        val ENDPOINT: PropertyDescriptor =
+            PropertyDescriptor.Builder().name("endpoint").displayName("Endpoint").description("S3 endpoint (url)")
+                .required(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+
+        val PREFIX: PropertyDescriptor = PropertyDescriptor.Builder().name("prefix").displayName("Prefix")
+            .description("Prefix (folder-like) in S3 that contains the files to download")
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).required(true)
+            .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
 
         private const val TEKST_PREFIX = "tekst_"
     }
@@ -71,6 +91,12 @@ class ReorderFiles(
     override fun init(context: ProcessorInitializationContext) {
         descriptors.add(BASE_DIR)
         descriptors.add(RENAME_ZERO_PAD_STRING)
+        descriptors.add(BUCKET)
+        descriptors.add(ACCESS_KEY)
+        descriptors.add(SECRET_KEY)
+        descriptors.add(REGION)
+        descriptors.add(ENDPOINT)
+        descriptors.add(PREFIX)
         descriptors = Collections.unmodifiableList(descriptors)
 
         relationships = HashSet<Relationship>().apply {
@@ -89,11 +115,8 @@ class ReorderFiles(
      * Disallows path traversal sequences and path separator characters.
      */
     private fun isSafeName(name: String): Boolean {
-        val safe = name.isNotBlank() &&
-                !name.contains("..") &&
-                !name.contains("/") &&
-                !name.contains("\\") &&
-                !name.contains("\u0000")
+        val safe =
+            name.isNotBlank() && !name.contains("..") && !name.contains("/") && !name.contains("\\") && !name.contains("\u0000")
         if (!safe) {
             logger.warn("Validation failed for name: '{}'", name)
         }
@@ -114,14 +137,11 @@ class ReorderFiles(
 
     /** Example of entries when ItemId=ID1 and zeroPadding="%02d"
      * entries: [
-     *   {originalName: ID1_01.jp2, newName: ID1_01.jp2},
-     *   {originalName: ID2_04.jp2, newName: ID1_02.jp2}]
+     *   {originalName: ID1_01.tif, newName: ID1_01.tif},
+     *   {originalName: ID2_04.tif, newName: ID1_02.tif}]
      */
     fun addInstruction(
-        itemId: String,
-        orderedImages: JsonNode?,
-        zeroPadding: String,
-        baseDirPath: Path
+        itemId: String, orderedImages: JsonNode?, zeroPadding: String, baseDirPath: Path
     ): List<RenameInstruction> {
         logger.info("Adding rename instructions for itemId='{}', images={}", itemId, orderedImages?.size() ?: 0)
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
@@ -133,15 +153,19 @@ class ReorderFiles(
             require(isSafeName(rawName)) { "Invalid image name: $rawName" }
             val prefixedName = if (rawName.startsWith(TEKST_PREFIX)) rawName else "$TEKST_PREFIX$rawName"
 
-            val originalName = if (prefixedName.endsWith(".jp2", ignoreCase = true)) prefixedName else "$prefixedName.jp2"
+            val originalName = when {
+                prefixedName.endsWith(".tif", ignoreCase = true) -> prefixedName
+                prefixedName.endsWith(".tiff", ignoreCase = true) -> prefixedName
+                else -> "$prefixedName.tif"  // default to .tif if no extension
+            }
             val pageNumber = String.format(zeroPadding, index + 1)
-            val newName = "$TEKST_PREFIX${itemId}_$pageNumber.jp2"
+            val extension = originalName.substringAfterLast('.')
+            val newName = "$TEKST_PREFIX${itemId}_$pageNumber.$extension"
 
             // Verify both original and new paths stay within base dir
             requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(originalName))
             requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
 
-            logger.warn("Invalid image name encountered: '{}'", rawName)
             listOfInstructions.add(RenameInstruction(originalName, newName))
         }
 
@@ -152,7 +176,8 @@ class ReorderFiles(
         // itemId must be validated before calling this function
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
         val folderName = "$TEKST_PREFIX$itemId"
-        val ocrDirPath = baseDirPath.resolve(folderName).resolve("representations/access/metadata/other/ocr").normalize()
+        val ocrDirPath =
+            baseDirPath.resolve(folderName).resolve("representations/access/metadata/other/ocr").normalize()
 
         logger.info("Attempting to delete OCR files for itemId={} in directory: {}", itemId, ocrDirPath)
 
@@ -161,34 +186,69 @@ class ReorderFiles(
 
         val ocrDir = ocrDirPath.toFile()
         if (ocrDir.exists() && ocrDir.isDirectory) {
-            val files = ocrDir.listFiles()?.filter { it.isFile && it.name.endsWith(".xml", ignoreCase = true) } ?: emptyList()
+            val files =
+                ocrDir.listFiles()?.filter { it.isFile && it.name.endsWith(".xml", ignoreCase = true) } ?: emptyList()
             logger.info("Found {} OCR XML files to delete in {}", files.size, ocrDirPath)
             files.forEach { file ->
                 requireWithinBaseDir(baseDirPath, file.toPath())
-                val deleted = file.delete()
-                logger.info("Deleting file {}: {}", file.absolutePath, if (deleted) "SUCCESS" else "FAILED")
+                file.delete()
+                logger.debug("Deleted OCR file '{}'", file.absolutePath)
             }
         } else {
             logger.info("OCR directory does not exist or is not a directory: {}", ocrDirPath)
         }
     }
 
+    /**
+     * Processes the changes array from the flowfile JSON, building rename instructions
+     * for each item. Generates a new UUID for items with missing or null itemIds.
+     */
+    private fun processChanges(
+        changes: JsonNode, zeroPadding: String, baseDirPath: Path
+    ): ProcessChangesResult {
+        val renameInstructions = mutableListOf<RenameInstruction>()
+        val itemIds = mutableListOf<String>()
+        val items = mutableListOf<Map<String, Any>>()
+
+        for (change in changes) {
+            var itemId = change.get("itemId")?.asText()?.trim() ?: ""
+            if (itemId.isBlank() || itemId.isEmpty()) itemId = uuidProvider()
+            require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
+            itemIds.add(itemId)
+
+            val orderedImages = change.get("orderedImageIds")
+            val itemInstruction = addInstruction(itemId, orderedImages, zeroPadding, baseDirPath)
+            renameInstructions += itemInstruction
+            items.add(mapOf("itemId" to itemId, "pages" to itemInstruction.size))
+        }
+        return ProcessChangesResult(renameInstructions, itemIds, items)
+    }
+
     override fun onTrigger(context: ProcessContext, session: ProcessSession) {
         var flowFile: FlowFile = session.get() ?: return
+
+        val bucket = context.getProperty(BUCKET).evaluateAttributeExpressions(flowFile).value
+        val accessKey = context.getProperty(ACCESS_KEY).evaluateAttributeExpressions(flowFile).value
+        val secretKey = context.getProperty(SECRET_KEY).value
+        val region = context.getProperty(REGION).evaluateAttributeExpressions(flowFile).value
+        val endpoint = context.getProperty(ENDPOINT).evaluateAttributeExpressions(flowFile).value
+        val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value.trimEnd('/')
+        val client = s3ClientProvider?.invoke(accessKey, secretKey, region, endpoint) ?: getS3Client(
+            accessKey,
+            secretKey,
+            region,
+            endpoint
+        )
         try {
-            logger.info("Starting onTrigger for flowFile id={}", flowFile.id)
-            val zeroPadding = context.getProperty(RENAME_ZERO_PAD_STRING).evaluateAttributeExpressions(flowFile).value ?: "%05d"
-            val baseDirValue = context.getProperty(BASE_DIR)
-                .evaluateAttributeExpressions(flowFile)
-                .value
+            val zeroPadding =
+                context.getProperty(RENAME_ZERO_PAD_STRING).evaluateAttributeExpressions(flowFile).value ?: "%05d"
+            val baseDirValue = context.getProperty(BASE_DIR).evaluateAttributeExpressions(flowFile).value
                 ?: throw ProcessException("base_dir property is missing")
 
-            logger.info("Using baseDir='{}', zeroPadding='{}'", baseDirValue, zeroPadding)
             val baseDirFile = File(baseDirValue).canonicalFile
             val baseDirPath = baseDirFile.toPath().normalize()
 
             if (!baseDirFile.exists() || !baseDirFile.isDirectory) {
-                logger.error("Invalid base directory: {}", baseDirFile)
                 throw ProcessException("Invalid base directory: $baseDirFile")
             }
 
@@ -199,42 +259,33 @@ class ReorderFiles(
                 flowFileJson = input.bufferedReader(StandardCharsets.UTF_8).readText()
             }
 
-            val mapper = ObjectMapper()
             val rootNode: JsonNode = mapper.readTree(flowFileJson)
-
-            val batchId = rootNode.get("batchId")?.asText()
+            val batchId = rootNode.get("batchId")?.takeIf { !it.isNull }?.asText()
             val changes = rootNode.get("changes")
-            val renameInstructions = mutableListOf<RenameInstruction>()
-            val newOrder = mutableListOf<String>()
-            val items = mutableListOf<Map<String, Any>>()
 
-            logger.info("Parsed JSON for batchId='{}', changes count={}", batchId, changes?.size() ?: 0)
+            logger.info("Processing batchId='{}', changes={}", batchId, changes?.size() ?: 0)
 
             if (changes != null && changes.isArray) {
-                for (change in changes) {
-                    // Validate and resolve itemId up front in onTrigger
-                    var itemId: String = change.get("itemId")?.asText()?.trim() ?: ""
-                    if (itemId.isBlank() || itemId == "null") {
-                        itemId = uuidProvider()
+                val (renameInstructions, itemIds, items) = processChanges(changes, zeroPadding, baseDirPath)
+
+                logger.debug("Reordering {} files on disk for batchId='{}'", renameInstructions.size, batchId)
+                renameFilsOnDisk(baseDirPath, renameInstructions)
+                logger.info("Reordered {} files on disk for batchId='{}'", renameInstructions.size, batchId)
+
+                try {
+                    logger.debug("Reordering {} files on S3 for batchId='{}'", renameInstructions.size, batchId)
+                    renameS3Files(client, bucket, renameInstructions, prefix)
+                    logger.info("Reordered {} files on S3 for batchId='{}'", renameInstructions.size, batchId)
+                } catch (e: Exception) {
+                    logger.error("S3 rename failed, attempting disk rollback for batchId='{}'", batchId, e)
+                    val rollbackInstructions = renameInstructions.map {
+                        RenameInstruction(originalName = it.newName, newName = it.originalName)
                     }
-
-                    // Validate itemId before any use
-                    require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
-
-                    val orderedImages = change.get("orderedImageIds")
-                    val itemInstruction = addInstruction(itemId, orderedImages, zeroPadding, baseDirPath)
-                    renameInstructions += itemInstruction
-
-                    val itemNewOrder = itemInstruction.map { it.newName }
-                    newOrder += itemNewOrder
-                    items.add(mapOf("itemId" to itemId, "pages" to itemNewOrder.size))
-
-                    deleteOcrFiles(itemId, baseDirPath)
+                    renameFilsOnDisk(baseDirPath, rollbackInstructions)
+                    throw e
                 }
 
-                logger.info("Reordering files for batchId=$batchId")
-                renameAll(baseDirPath, renameInstructions)
-                logger.info("Finished reordering files for batchId=$batchId")
+                itemIds.forEach { itemId -> deleteOcrFiles(itemId, baseDirPath) }
 
                 val outputJson = mapper.writeValueAsString(
                     mapOf(
@@ -253,8 +304,8 @@ class ReorderFiles(
                 }
             }
 
+            logger.info("Successfully processed batchId='{}'", batchId)
             session.transfer(flowFile, REL_SUCCESS)
-            logger.info("Wrote output JSON for batchId={}", batchId)
 
         } catch (exception: Exception) {
             logger.error("Failed to reorder files", exception)
