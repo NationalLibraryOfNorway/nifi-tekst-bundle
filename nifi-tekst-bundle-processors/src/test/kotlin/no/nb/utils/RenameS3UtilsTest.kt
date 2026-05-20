@@ -153,6 +153,53 @@ class RenameS3UtilsTest : MinIOTestBase() {
         }
 
         @Test
+        fun `should move an entire object to another itemId`() {
+            val sourceItemId = "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec"
+            val targetItemId = "tekst_019b4bb4-e1bf-8769-ab55-6ef015d62cfd"
+
+            fun sourceAccess(name: String) = "$testPrefix/$sourceItemId/representations/access/data/$name"
+            fun sourcePrimary(name: String) = "$testPrefix/$sourceItemId/representations/primary/data/$name"
+            fun targetAccess(name: String) = "$testPrefix/$targetItemId/representations/access/data/$name"
+            fun targetPrimary(name: String) = "$testPrefix/$targetItemId/representations/primary/data/$name"
+
+            // Seed source object with 3 pages in both representations
+            val pages = (1..3).map { "%05d".format(it) }
+            pages.forEach { page ->
+                putObject(sourceAccess("${sourceItemId}_$page.tif"), "access-$page")
+                putObject(sourcePrimary("${sourceItemId}_$page.tif"), "primary-$page")
+            }
+
+            val instructions = pages.map { page ->
+                RenameInstruction(
+                    originalName = "${sourceItemId}_$page.tif",
+                    newName = "${targetItemId}_$page.tif"
+                )
+            }
+
+            RenameS3Utils.renameS3Files(minioClient, BUCKET, instructions, testPrefix)
+
+            // Every file now lives under the target itemId
+            pages.forEach { page ->
+                assertTrue(keyExists(targetAccess("${targetItemId}_$page.tif")),
+                    "Target access key should exist for page $page")
+                assertTrue(keyExists(targetPrimary("${targetItemId}_$page.tif")),
+                    "Target primary key should exist for page $page")
+            }
+
+            // Source object folder is fully cleared
+            pages.forEach { page ->
+                assertFalse(keyExists(sourceAccess("${sourceItemId}_$page.tif")),
+                    "Source access key should be deleted for page $page")
+                assertFalse(keyExists(sourcePrimary("${sourceItemId}_$page.tif")),
+                    "Source primary key should be deleted for page $page")
+            }
+            assertTrue(listAllKeys().none { it.contains("/$sourceItemId/") },
+                "No keys should remain under the source itemId folder")
+            assertTrue(listAllKeys().none { it.startsWith("tmp_") },
+                "No temp keys should remain after cross-object move")
+        }
+
+        @Test
         fun `should leave no temp keys after successful rename`() {
             makeAccessObject("${standardFilename}_00001.tif")
             makePrimaryObject("${standardFilename}_00001.tif")
