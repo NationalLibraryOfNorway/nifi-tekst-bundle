@@ -66,8 +66,7 @@ object TestFileUtils {
      */
     fun createS3Files(
         changes: JsonNode,
-        minioTestBase:
-        MinIOTestBase,
+        minioTestBase: MinIOTestBase,
         prefix: String
     ): List<String> {
         val createdKeys = mutableListOf<String>()
