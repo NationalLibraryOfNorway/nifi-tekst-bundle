@@ -11,7 +11,7 @@ import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 
-class RenameDiskUtilsTest: MinIOTestBase() {
+class RenameDiskUtilsTest {
 
     private lateinit var jsonFile: JsonNode
     private lateinit var baseDir: Path
