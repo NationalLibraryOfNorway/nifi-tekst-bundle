@@ -2,6 +2,7 @@ package no.nb.utils
 
 import io.minio.CopyObjectArgs
 import io.minio.CopySource
+import io.minio.ListObjectsArgs
 import io.minio.MinioClient
 import io.minio.RemoveObjectArgs
 import io.minio.RemoveObjectsArgs
@@ -11,7 +12,6 @@ import io.minio.messages.DeleteObject
 import no.nb.models.RenameInstruction
 import no.nb.utils.RenameUtils.extractIdFromFilename
 import org.slf4j.LoggerFactory
-import kotlin.text.get
 
 object RenameS3Utils {
 
@@ -20,6 +20,8 @@ object RenameS3Utils {
         "representations/access/data",
         "representations/primary/data"
     )
+
+    private data class StagedS3File(val sourceKey: String, val tempKey: String, val finalKey: String)
 
     /**
      * Renames S3 objects to match a list of rename instructions, using a two-phase
@@ -49,8 +51,7 @@ object RenameS3Utils {
 
         logger.info("Starting S3 rename of ${effectiveRenames.size} instructions in bucket '$bucket'")
 
-        val stagedForRollback = mutableListOf<Pair<String, String>>()
-        val stagedMoves = mutableListOf<Pair<String, String>>()
+        val staged = mutableListOf<StagedS3File>()
 
         // Staging: Copy all originals to temp/stage
         // This ensures swap/cycle conflicts (e.g. A→B and B→A) are handled safely.
@@ -64,8 +65,7 @@ object RenameS3Utils {
                 for (representation in KEY_REPRESENTATIONS) {
                     val sourceKey = buildKey(prefix, sourceId, representation, instruction.originalName)
                     val finalKey = buildKey(prefix, targetId, representation, instruction.newName)
-                    // Each temp key is unique per file to avoid naming conflicts
-                    val stagedKey = "tmp_${UUIDv7.randomUUID()}_${instruction.originalName}"
+                    val tempKey = "tmp_${UUIDv7.randomUUID()}_${instruction.originalName}"
 
                     if (!keyExists(client, bucket, sourceKey)) {
                         throw IllegalStateException(
@@ -74,30 +74,29 @@ object RenameS3Utils {
                         )
                     }
 
-                    copyObjectWithinBucket(client, bucket, sourceKey, stagedKey)
-                    stagedForRollback.add(stagedKey to sourceKey)
-                    stagedMoves.add(stagedKey to finalKey)
+                    copyObjectWithinBucket(client, bucket, sourceKey, tempKey)
+                    staged.add(StagedS3File(sourceKey, tempKey, finalKey))
                 }
             }
         } catch (e: Exception) {
-            logger.error("Staging failed after ${stagedForRollback.size} keys copied, rolling back all temp keys", e)
-            rollbackDelete(client, bucket, stagedForRollback.map { it.first })
+            logger.error("Staging failed after ${staged.size} keys copied, rolling back all temp keys", e)
+            rollbackDelete(client, bucket, staged.map { it.tempKey })
             throw e
         }
 
-        //Commit: Copy temp keys to final destinations
+        // Commit: Copy temp keys to final destinations
         // All originals are safely staged at this point, so no swap conflicts possible.
         val completedFinals = mutableListOf<String>()
         try {
-            for ((stagedKey, finalKey) in stagedMoves) {
-                copyObjectWithinBucket(client, bucket, stagedKey, finalKey)
-                completedFinals.add(finalKey)
-                logger.debug("Committed temp key '$stagedKey' to final destination '$finalKey'")
+            for (file in staged) {
+                copyObjectWithinBucket(client, bucket, file.tempKey, file.finalKey)
+                completedFinals.add(file.finalKey)
+                logger.debug("Committed temp key '${file.tempKey}' to final destination '${file.finalKey}'")
             }
         } catch (e: Exception) {
-            logger.error("Commit failed after ${completedFinals.size} of ${stagedMoves.size} keys written, rolling back", e)
+            logger.error("Commit failed after ${completedFinals.size} of ${staged.size} keys written, rolling back", e)
             rollbackDelete(client, bucket, completedFinals)
-            rollbackDelete(client, bucket, stagedForRollback.map { it.first })
+            rollbackDelete(client, bucket, staged.map { it.tempKey })
             throw e
         }
 
@@ -105,15 +104,15 @@ object RenameS3Utils {
         // Only delete originals that are NOT also a final destination.
         // Example: in a swap A→B, B→A, both A and B appear as both source and destination,
         // so neither should be deleted — the final copy already wrote the correct content there.
-        val finalKeys = stagedMoves.map { it.second }.toSet()
-        val originalKeysToDelete = stagedForRollback
-            .map { it.second }
-            .filter { originalKey -> originalKey !in finalKeys }
+        val finalKeys = staged.map { it.finalKey }.toSet()
+        val originalKeysToDelete = staged
+            .map { it.sourceKey }
+            .filter { it !in finalKeys }
 
-        logger.debug("Deleting ${originalKeysToDelete.size} original keys and ${stagedForRollback.size} temp keys from bucket '$bucket'")
+        logger.debug("Deleting ${originalKeysToDelete.size} original keys and ${staged.size} temp keys from bucket '$bucket'")
 
         batchDelete(client, bucket, originalKeysToDelete)
-        batchDelete(client, bucket, stagedForRollback.map { it.first })
+        batchDelete(client, bucket, staged.map { it.tempKey })
 
         logger.info("S3 rename complete — ${effectiveRenames.size} instructions processed, ${originalKeysToDelete.size} original keys deleted from bucket '$bucket'")
     }
@@ -208,4 +207,22 @@ object RenameS3Utils {
     private fun buildKey(prefix: String?, itemId: String, representation: String, filename: String): String =
         if (prefix.isNullOrBlank()) "$itemId/$representation/$filename"
         else "$prefix/$itemId/$representation/$filename"
+
+    /**
+     * Deletes all keys in the bucket that share a common prefix.
+     * Used to clean up an itemId's entire folder when all its files have been moved away.
+     */
+    fun deleteAllKeysWithPrefix(client: MinioClient, bucket: String, keyPrefix: String) {
+        val keys = client.listObjects(
+            ListObjectsArgs.builder().bucket(bucket).prefix(keyPrefix).recursive(true).build()
+        ).map { it.get().objectName() }
+
+        if (keys.isEmpty()) {
+            logger.debug("No keys found with prefix '$keyPrefix' in bucket '$bucket'")
+            return
+        }
+
+        logger.info("Deleting ${keys.size} keys with prefix '$keyPrefix' from bucket '$bucket'")
+        batchDelete(client, bucket, keys)
+    }
 }
