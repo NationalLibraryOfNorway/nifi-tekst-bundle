@@ -3,6 +3,11 @@ package no.nb.nifi.tekst.processors
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.minio.MinioClient
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import no.nb.nifi.tekst.util.S3ClientFactory
 import no.nb.utils.MinIOTestBase
 import no.nb.utils.TestFileUtils
 import no.nb.utils.TestFileUtils.createDiskFiles
@@ -16,9 +21,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -45,6 +47,7 @@ class ReorderFilesTest : MinIOTestBase() {
     @AfterEach
     fun tearDown() {
         baseDir.toFile().deleteRecursively()
+        unmockkObject(S3ClientFactory)
     }
 
     private fun setupTestRunner(processor: ReorderFiles = reorderFiles): TestRunner =
@@ -216,27 +219,20 @@ class ReorderFilesTest : MinIOTestBase() {
 
     @Test
     fun `processor should rollback disk changes when s3 rename fails`() {
-        val mockS3Client = mock(MinioClient::class.java)
-        `when`(mockS3Client.copyObject(any(io.minio.CopyObjectArgs::class.java))).thenThrow(RuntimeException("Simulated S3 failure"))
+        val mockS3Client = mockk<MinioClient>(relaxed = true)
+        every { mockS3Client.copyObject(any()) } throws RuntimeException("Simulated S3 failure")
 
-        val reorderFilesWithUuid =
-            ReorderFiles(uuidProvider = { fixedUuid }, s3ClientProvider = { _, _, _, _ -> mockS3Client })
+        mockkObject(S3ClientFactory)
+        every { S3ClientFactory.getS3Client(any(), any(), any(), any()) } returns mockS3Client
+
+        val reorderFilesWithUuid = ReorderFiles(uuidProvider = { fixedUuid })
 
         val inputJson = mapper.writeValueAsString(flowFile)
 
         val diskFiles = createDiskFiles(changes, baseDir)
         val ocrFiles = createOcrFiles(changes, baseDir, fixedUuid)
 
-        val failingRunner = TestRunners.newTestRunner(reorderFilesWithUuid).apply {
-            setProperty(ReorderFiles.BASE_DIR, baseDir.toString())
-            setProperty(ReorderFiles.ENDPOINT, s3Endpoint)
-            setProperty(ReorderFiles.BUCKET, BUCKET)
-            setProperty(ReorderFiles.ACCESS_KEY, s3AccessKey)
-            setProperty(ReorderFiles.SECRET_KEY, s3SecretKey)
-            setProperty(ReorderFiles.REGION, REGION)
-            setProperty(ReorderFiles.PREFIX, testPrefix)
-            assertValid()
-        }
+        val failingRunner = setupTestRunner(reorderFilesWithUuid)
         failingRunner.enqueue(inputJson.toByteArray())
         failingRunner.run()
 
@@ -248,5 +244,86 @@ class ReorderFilesTest : MinIOTestBase() {
         ocrFiles.forEach { file ->
             assertTrue(file.exists(), "OCR file should still exist since S3 rename failed: ${file.absolutePath}")
         }
+    }
+
+    @Test
+    fun `when all images from item A are assigned to item B, item A's folder should be cleaned up on disk and in S3`() {
+        val itemA = "019a3aa3-d0af-7658-9a44-aaaaaaaaaaaa"
+        val itemB = "019a3aa3-d0af-7658-9a44-bbbbbbbbbbbb"
+        val folderA = "tekst_$itemA"
+        val folderB = "tekst_$itemB"
+
+        // Item B's orderedImageIds are all of item A's source files,
+        // so item A becomes a pure source with no files left after the rename.
+        val inputJson = """
+            {
+              "batchId": "test-batch",
+              "changes": [
+                {
+                  "itemId": "$itemB",
+                  "orderedImageIds": [
+                    "${folderA}_00001",
+                    "${folderA}_00002"
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+        val parsedChanges = mapper.readTree(inputJson)["changes"]
+
+        // Seed disk: item A has 2 .tif files in access+primary, plus 2 OCR xmls.
+        val diskFiles = createDiskFiles(parsedChanges, baseDir)
+        val ocrFiles = createOcrFiles(parsedChanges, baseDir, itemA)
+        val s3Keys = createS3Files(parsedChanges, this, testPrefix)
+
+        // Sanity checks before run
+        val itemADir = baseDir.resolve(folderA).toFile()
+        assertTrue(itemADir.exists(), "Item A folder should exist before run")
+        assertTrue(ocrFiles.all { it.exists() }, "OCR files should exist before run")
+        assertTrue(diskFiles.all { it.exists() }, "Source .tif files should exist before run")
+        assertTrue(s3Keys.all { keyExists(it) }, "Source S3 keys should exist before run")
+
+        runner.enqueue(inputJson)
+        runner.run()
+        runner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
+
+        // Item A's entire folder must be gone on disk (data dirs + OCR + parent folder)
+        assertFalse(itemADir.exists(), "Item A folder should be fully deleted on disk after cleanup")
+        ocrFiles.forEach { ocr ->
+            assertFalse(ocr.exists(), "OCR file for item A should be deleted: ${ocr.absolutePath}")
+        }
+
+        // Item B should contain the renamed files
+        listOf(1, 2).forEach { page ->
+            val pageStr = "%05d".format(page)
+            val accessFile = baseDir.resolve("$folderB/representations/access/data/${folderB}_$pageStr.tif").toFile()
+            val primaryFile = baseDir.resolve("$folderB/representations/primary/data/${folderB}_$pageStr.tif").toFile()
+            assertTrue(accessFile.exists(), "Renamed access file should exist for B page $page")
+            assertTrue(primaryFile.exists(), "Renamed primary file should exist for B page $page")
+        }
+
+        // S3: no keys should remain under item A's prefix
+        val remainingItemAKeys = listAllKeys().filter { it.startsWith("$testPrefix/$folderA/") }
+        assertTrue(
+            remainingItemAKeys.isEmpty(),
+            "No S3 keys should remain under item A's prefix; found: $remainingItemAKeys"
+        )
+
+        // S3: renamed files should exist under item B's prefix
+        listOf(1, 2).forEach { page ->
+            val pageStr = "%05d".format(page)
+            assertTrue(
+                keyExists("$testPrefix/$folderB/representations/access/data/${folderB}_$pageStr.tif"),
+                "Renamed access key should exist in S3 for B page $page"
+            )
+            assertTrue(
+                keyExists("$testPrefix/$folderB/representations/primary/data/${folderB}_$pageStr.tif"),
+                "Renamed primary key should exist in S3 for B page $page"
+            )
+        }
+        assertTrue(
+            listAllKeys().none { it.startsWith("tmp_") },
+            "No temp keys should remain after successful run"
+        )
     }
 }

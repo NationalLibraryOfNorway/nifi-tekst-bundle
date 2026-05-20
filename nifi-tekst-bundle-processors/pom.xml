@@ -273,6 +273,12 @@
             <version>1.21.4</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.mockk</groupId>
+            <artifactId>mockk-jvm</artifactId>
+            <version>1.13.13</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

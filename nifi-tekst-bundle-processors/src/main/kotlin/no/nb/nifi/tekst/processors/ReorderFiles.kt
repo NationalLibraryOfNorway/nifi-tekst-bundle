@@ -6,8 +6,10 @@ import io.minio.MinioClient
 import no.nb.models.ProcessChangesResult
 import no.nb.models.RenameInstruction
 import no.nb.utils.RenameDiskUtils.renameFilesOnDisk
+import no.nb.utils.RenameS3Utils.deleteAllKeysWithPrefix
 import no.nb.utils.RenameS3Utils.renameS3Files
 import no.nb.nifi.tekst.util.S3ClientFactory.getS3Client
+import no.nb.utils.RenameUtils.extractIdFromFilename
 import no.nb.utils.UUIDv7
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
 import org.apache.nifi.annotation.documentation.CapabilityDescription
@@ -20,6 +22,7 @@ import org.apache.nifi.processor.exception.ProcessException
 import org.apache.nifi.processor.util.StandardValidators
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 
@@ -30,8 +33,7 @@ import java.util.*
 )
 
 class ReorderFiles(
-    private val uuidProvider: () -> String = { UUIDv7.randomUUID().toString() },
-    private val s3ClientProvider: ((accessKey: String, secretKey: String, region: String, endpoint: String) -> MinioClient)? = null
+    private val uuidProvider: () -> String = { UUIDv7.randomUUID().toString() }
 ) : AbstractProcessor() {
 
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
@@ -39,47 +41,83 @@ class ReorderFiles(
 
     companion object {
         private val mapper = ObjectMapper()
-        val BASE_DIR: PropertyDescriptor = PropertyDescriptor.Builder().name("base_dir").displayName("Base Directory")
-            .description("Base directory for renaming files. Supports Expression Language.").required(true)
+        val BASE_DIR: PropertyDescriptor = PropertyDescriptor.Builder()
+            .name("base_dir")
+            .displayName("Base Directory")
+            .description("Base directory for renaming files. Supports Expression Language.")
+            .required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+            .build()
 
-        val RENAME_ZERO_PAD_STRING: PropertyDescriptor =
-            PropertyDescriptor.Builder().name("rename_zero_pad_string").displayName("Zero pad string")
-                .description("Format string to use for zero-padded numbers (e.g. '%05d').").required(true)
+        val RENAME_ZERO_PAD_STRING: PropertyDescriptor = PropertyDescriptor.Builder()
+                .name("rename_zero_pad_string")
+                .displayName("Zero pad string")
+                .description("Format string to use for zero-padded numbers (e.g. '%05d').")
+                .required(true)
                 .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).defaultValue("%05d").build()
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                .defaultValue("%05d")
+                .build()
 
-        val REL_SUCCESS: Relationship =
-            Relationship.Builder().description("Successfully generated JSON").name("success").build()
+        val REL_SUCCESS: Relationship = Relationship.Builder()
+                .description("Successfully generated JSON")
+                .name("success")
+                .build()
 
-        val REL_FAILURE: Relationship = Relationship.Builder().description("Failed processing").name("failure").build()
+        val REL_FAILURE: Relationship = Relationship.Builder()
+            .description("Failed processing")
+            .name("failure")
+            .build()
 
-        val BUCKET: PropertyDescriptor =
-            PropertyDescriptor.Builder().name("bucket").displayName("S3 bucket").description("S3 bucket name")
-                .required(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
-
-        val ACCESS_KEY: PropertyDescriptor =
-            PropertyDescriptor.Builder().name("access_key").displayName("S3 access key").description("S3 access key")
-                .required(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
-
-        val SECRET_KEY: PropertyDescriptor =
-            PropertyDescriptor.Builder().name("secret_key").displayName("S3 secret key").description("S3 secret key")
-                .required(true).sensitive(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR).build()
-
-        val REGION: PropertyDescriptor =
-            PropertyDescriptor.Builder().name("region").displayName("S3 region").description("S3 region").required(true)
+        val BUCKET: PropertyDescriptor = PropertyDescriptor.Builder()
+                .name("bucket")
+                .displayName("S3 bucket")
+                .description("S3 bucket name")
+                .required(true)
                 .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                .build()
 
-        val ENDPOINT: PropertyDescriptor =
-            PropertyDescriptor.Builder().name("endpoint").displayName("Endpoint").description("S3 endpoint (url)")
-                .required(true).addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES).build()
+        val ACCESS_KEY: PropertyDescriptor = PropertyDescriptor.Builder()
+                .name("access_key")
+                .displayName("S3 access key")
+                .description("S3 access key")
+                .required(true)
+                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                .build()
 
-        val PREFIX: PropertyDescriptor = PropertyDescriptor.Builder().name("prefix").displayName("Prefix")
+        val SECRET_KEY: PropertyDescriptor = PropertyDescriptor.Builder()
+                .name("secret_key")
+                .displayName("S3 secret key")
+                .description("S3 secret key")
+                .required(true)
+                .sensitive(true)
+                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .build()
+
+        val REGION: PropertyDescriptor = PropertyDescriptor.Builder()
+                .name("region")
+                .displayName("S3 region")
+                .description("S3 region")
+                .required(true)
+                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                .build()
+
+        val ENDPOINT: PropertyDescriptor = PropertyDescriptor.Builder()
+                .name("endpoint")
+                .displayName("Endpoint")
+                .description("S3 endpoint (url)")
+                .required(true)
+                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                .build()
+
+        val PREFIX: PropertyDescriptor = PropertyDescriptor.Builder()
+            .name("prefix")
+            .displayName("Prefix")
             .description("Prefix (folder-like) in S3 that contains the files to download")
             .required(true)
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
@@ -116,8 +154,11 @@ class ReorderFiles(
      * Disallows path traversal sequences and path separator characters.
      */
     private fun isSafeName(name: String): Boolean {
-        val safe =
-            name.isNotBlank() && !name.contains("..") && !name.contains("/") && !name.contains("\\") && !name.contains("\u0000")
+        val safe = name.isNotBlank() &&
+                !name.contains("..") &&
+                !name.contains("/") &&
+                !name.contains("\\") &&
+                !name.contains("\u0000")
         if (!safe) {
             logger.warn("Validation failed for name: '{}'", name)
         }
@@ -174,6 +215,56 @@ class ReorderFiles(
         return listOfInstructions
     }
 
+    /**
+     * Detects source folders that have been fully emptied by the rename — i.e. itemIds that
+     * appear only as a source (not also as a target) and whose `representations/access/data`
+     * and `representations/primary/data` directories are now empty on disk.
+     *
+     * For each such folder, removes the entire `tekst_<id>` directory tree on disk
+     * (data dirs, OCR XMLs, anything else under it) and deletes all S3 keys under
+     * `<prefix>/tekst_<id>/`.
+     */
+    private fun cleanupEmptiedSourceFolders(
+        baseDirPath: Path,
+        renameInstructions: List<RenameInstruction>,
+        client: MinioClient,
+        bucket: String,
+        prefix: String
+    ) {
+        val sourceFolders = renameInstructions.mapNotNull { extractIdFromFilename(it.originalName) }.toSet()
+        val targetFolders = renameInstructions.mapNotNull { extractIdFromFilename(it.newName) }.toSet()
+        val candidates = sourceFolders - targetFolders
+
+        for (folder in candidates) {
+            require(isSafeName(folder)) { "Invalid source folder name: $folder" }
+            val itemDir = baseDirPath.resolve(folder).normalize()
+            requireWithinBaseDir(baseDirPath, itemDir)
+
+            val accessData = itemDir.resolve("representations/access/data")
+            val primaryData = itemDir.resolve("representations/primary/data")
+
+            val accessEmpty = !Files.exists(accessData) ||
+                    Files.list(accessData).use { stream -> !stream.findAny().isPresent }
+            val primaryEmpty = !Files.exists(primaryData) ||
+                    Files.list(primaryData).use { stream -> !stream.findAny().isPresent }
+
+            if (!(accessEmpty && primaryEmpty)) {
+                logger.debug(
+                    "Source folder '{}' is not fully emptied (access empty={}, primary empty={}); skipping cleanup",
+                    folder, accessEmpty, primaryEmpty
+                )
+                continue
+            }
+
+            logger.info("Source folder '{}' fully emptied by rename — cleaning up disk and S3", folder)
+            if (Files.exists(itemDir)) {
+                val deleted = itemDir.toFile().deleteRecursively()
+                if (!deleted) logger.warn("Failed to fully delete emptied source folder: {}", itemDir)
+            }
+            deleteAllKeysWithPrefix(client, bucket, "$prefix/$folder/")
+        }
+    }
+
     fun deleteOcrFiles(itemId: String, baseDirPath: Path) {
         // itemId must be validated before calling this function
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
@@ -213,13 +304,12 @@ class ReorderFiles(
         val items = mutableListOf<Map<String, Any>>()
 
         for (change in changes) {
-            val itemIdNode = change.get("itemId")
-            var itemId = if (itemIdNode == null || itemIdNode.isNull) {
-                ""
-            } else {
-                itemIdNode.asText().trim()
-            }
-            if (itemId.isBlank() || itemId.equals("null", ignoreCase = true)) itemId = uuidProvider()
+            val itemId = change.get("itemId")
+                ?.takeUnless { it.isNull }
+                ?.asText()?.trim()
+                ?.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                ?: uuidProvider()
+
             require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
             itemIds.add(itemId)
 
@@ -241,12 +331,7 @@ class ReorderFiles(
             val region = context.getProperty(REGION).evaluateAttributeExpressions(flowFile).value
             val endpoint = context.getProperty(ENDPOINT).evaluateAttributeExpressions(flowFile).value
             val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value.trimEnd('/')
-            val client = s3ClientProvider?.invoke(accessKey, secretKey, region, endpoint) ?: getS3Client(
-                accessKey,
-                secretKey,
-                region,
-                endpoint
-            )
+            val client = getS3Client(accessKey, secretKey, region, endpoint)
             val zeroPadding =
                 context.getProperty(RENAME_ZERO_PAD_STRING).evaluateAttributeExpressions(flowFile).value ?: "%05d"
             val baseDirValue = context.getProperty(BASE_DIR).evaluateAttributeExpressions(flowFile).value
@@ -293,6 +378,8 @@ class ReorderFiles(
                 }
 
                 itemIds.forEach { itemId -> deleteOcrFiles(itemId, baseDirPath) }
+
+                cleanupEmptiedSourceFolders(baseDirPath, renameInstructions, client, bucket, prefix)
 
                 val outputJson = mapper.writeValueAsString(
                     mapOf(
