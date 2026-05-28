@@ -219,7 +219,9 @@ class CreateMetsBrowsing : AbstractProcessor() {
             }
 
             // Get sorted lists of files
-            val altoFiles = altoFolder.listFiles { file -> file.extension == "xml" }
+            val altoFiles = altoFolder.listFiles { file ->
+                file.extension == "xml" && !file.name.endsWith("mets.xml")
+            }
                 ?.sortedBy { it.name } ?: emptyList()
 
             val imageFiles = imageFolder.listFiles { file -> file.extension == "jp2" }

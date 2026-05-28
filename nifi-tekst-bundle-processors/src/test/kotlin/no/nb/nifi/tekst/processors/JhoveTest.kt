@@ -57,7 +57,11 @@ class JhoveTest {
 
         assertEquals(4, primaryOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
         assertEquals(4, accessOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
-        assertEquals(4, ocrOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
+        assertEquals(4, ocrOutputDir.listFiles { file ->
+                file.name.endsWith(".xml")
+                        && !file.name.endsWith("mets.xml.xml", ignoreCase = true)
+            }?.size
+        )
         assertEquals(1, descriptiveOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
     }
 
@@ -89,7 +93,10 @@ class JhoveTest {
             assertTrue(primaryOcrJhoveDir.exists(), "Primary OCR JHOVE output dir should exist")
             assertEquals(
                 4,
-                primaryOcrJhoveDir.listFiles { file -> file.name.endsWith(".xml") }?.size,
+                primaryOcrJhoveDir.listFiles { file ->
+                    file.name.endsWith(".xml")
+                            && !file.name.endsWith("mets.xml.xml", ignoreCase = true)
+                }?.size,
                 "Primary OCR JHOVE output should be generated for every OCR file"
             )
 

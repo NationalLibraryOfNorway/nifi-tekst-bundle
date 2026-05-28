@@ -1,0 +1,32 @@
+{
+  "batchId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "font" : "ANTIQUA",
+  "language" : "NOB",
+  "digital" : false,
+  "materialType" : "NEWSPAPER",
+  "publicationType" : "PERIODICAL",
+  "changes": [
+    {
+      "itemId": "019a3aa3-d0af-7658-9a44-5df904c51bec",
+      "orderedImageIds": [
+          "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00001",
+          "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00003",
+          "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00002",
+          "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00004",
+          "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec_00004"
+          ]
+      },
+    {
+      "itemId": "019a3aa3-d0af-7658-9a44-5dfe09e6ec1c",
+      "orderedImageIds": [
+        "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00001",
+        "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00002"
+      ]
+    },
+    {
+      "orderedImageIds": [
+        "tekst_019a3aa3-d0af-7658-9a44-5dfe09e6ec1c_00003"
+      ]
+    }
+  ]
+}
