@@ -114,6 +114,41 @@ feat/jhove-validation-TT-2225
 
 ---
 
+## Branch and Commit Naming
+
+Branches, commits, and PR titles should reference the Jira key (project `TT`) so work is traceable back to its issue.
+
+### Branches
+
+Format: `<type>/<short-kebab-description>-<TT-key>`
+
+```text
+feat/jhove-flyt-TT-2225
+```
+
+Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`.
+
+### Commit messages
+
+Format: `<Type>: <imperative summary>` (capitalized type, colon, concise summary).
+
+```text
+Fix: generate JHOVE OCR for primary representation when no access exists
+```
+
+- Use the body to explain *why* the change was made, not just *what* changed.
+- Reference the Jira key in the body or summary when it adds traceability.
+
+### Pull request titles
+
+Format: `<Type>: <Summary> (<TT-key>)`
+
+```text
+Feat: Jhove flyt (TT-2225)
+```
+
+---
+
 ## Code Style
 
 Follow existing code style in nearby files.
