@@ -66,6 +66,66 @@ class JhoveTest {
     }
 
     @Test
+    fun testPrimaryOcrJhoveGeneratedWhenNoAccessRepresentation() {
+        // Object with only a primary representation: image data plus OCR living under
+        // representations/primary/metadata/other/ocr, and no access representation at all.
+        val noAccessFolder = Files.createTempDirectory("jhove_no_access_")
+        try {
+            copyDir(
+                fixtureRoot.resolve("representations/primary/data"),
+                noAccessFolder.resolve("representations/primary/data")
+            )
+            copyDir(
+                fixtureRoot.resolve("representations/access/metadata/other/ocr"),
+                noAccessFolder.resolve("representations/primary/metadata/other/ocr")
+            )
+
+            val runner = TestRunners.newTestRunner(Jhove::class.java)
+            runner.setProperty(Jhove.OBJECT_FOLDER, noAccessFolder.toString())
+
+            runner.enqueue("test")
+            runner.run()
+
+            assertProcessed(runner)
+
+            val primaryOcrJhoveDir =
+                noAccessFolder.resolve("representations/primary/metadata/other/jhove-ocr").toFile()
+            assertTrue(primaryOcrJhoveDir.exists(), "Primary OCR JHOVE output dir should exist")
+            assertEquals(
+                4,
+                primaryOcrJhoveDir.listFiles { file ->
+                    file.name.endsWith(".xml")
+                            && !file.name.endsWith("mets.xml.xml", ignoreCase = true)
+                }?.size,
+                "Primary OCR JHOVE output should be generated for every OCR file"
+            )
+
+            // No access representation present, so no access JHOVE output should be produced.
+            assertFalse(
+                noAccessFolder.resolve("representations/access/metadata/other/jhove-ocr").toFile().exists(),
+                "Access OCR JHOVE output dir should not be created when no access representation exists"
+            )
+        } finally {
+            noAccessFolder.toFile().deleteRecursively()
+        }
+    }
+
+    private fun copyDir(source: Path, target: Path) {
+        Files.walk(source).use { stream ->
+            stream.forEach { path ->
+                val relative = source.relativize(path)
+                val destination = target.resolve(relative)
+                if (Files.isDirectory(path)) {
+                    Files.createDirectories(destination)
+                } else {
+                    Files.createDirectories(destination.parent)
+                    Files.copy(path, destination)
+                }
+            }
+        }
+    }
+
+    @Test
     fun testJhoveXmlOutputStructure() {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
 
