@@ -11,6 +11,7 @@ import no.nb.utils.RenameDiskUtils.renameFilesOnDisk
 import no.nb.utils.S3Utils.deleteAllKeysWithPrefix
 import no.nb.utils.RenameS3Utils.renameS3Files
 import no.nb.nifi.tekst.util.S3ClientFactory.getS3Client
+import no.nb.nifi.tekst.util.S3PropertyDescriptors
 import no.nb.utils.RenameUtils.extractIdFromFilename
 import no.nb.utils.UUIDv7
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
@@ -72,55 +73,16 @@ class ReorderFiles(
             .name("failure")
             .build()
 
-        val BUCKET: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("bucket")
-                .displayName("S3 bucket")
-                .description("S3 bucket name")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
-
-        val ACCESS_KEY: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("access_key")
-                .displayName("S3 access key")
-                .description("S3 access key")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
-
-        val SECRET_KEY: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("secret_key")
-                .displayName("S3 secret key")
-                .description("S3 secret key")
-                .required(true)
-                .sensitive(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .build()
-
-        val REGION: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("region")
-                .displayName("S3 region")
-                .description("S3 region")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
-
-        val ENDPOINT: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("endpoint")
-                .displayName("Endpoint")
-                .description("S3 endpoint (url)")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
+        val BUCKET: PropertyDescriptor = S3PropertyDescriptors.BUCKET
+        val ACCESS_KEY: PropertyDescriptor = S3PropertyDescriptors.ACCESS_KEY
+        val SECRET_KEY: PropertyDescriptor = S3PropertyDescriptors.SECRET_KEY
+        val REGION: PropertyDescriptor = S3PropertyDescriptors.REGION
+        val ENDPOINT: PropertyDescriptor = S3PropertyDescriptors.ENDPOINT
 
         val PREFIX: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("prefix")
             .displayName("Prefix")
-            .description("Prefix (folder-like) in S3 that contains the files to download")
+            .description("Prefix (folder-like) in S3 placed before tekst_<itemId>/ for the files being reordered.")
             .required(true)
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)

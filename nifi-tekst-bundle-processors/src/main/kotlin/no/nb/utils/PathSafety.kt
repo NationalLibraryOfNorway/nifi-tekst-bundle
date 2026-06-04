@@ -39,7 +39,7 @@ object PathSafety {
         val normalized = resolvedPath.normalize()
         if (!normalized.startsWith(baseDirPath.normalize())) {
             logger.error("Path traversal detected: {} is outside base directory {}", resolvedPath, baseDirPath)
-            throw IllegalArgumentException("Path traversal detected: $resolvedPath is outside base directory $baseDirPath")
+            throw SecurityException("Path traversal detected: $resolvedPath is outside base directory $baseDirPath")
         }
     }
 }

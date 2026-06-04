@@ -180,7 +180,7 @@ class RenameDiskUtilsTest {
 
     @Test
     fun `renameFilesOnDisk throws on path traversal attempt`() {
-        assertThrows(IllegalArgumentException::class.java) {
+        assertThrows(SecurityException::class.java) {
             renameFilesOnDisk(
                 baseDir, listOf(
                     RenameInstruction(

@@ -1,8 +1,6 @@
 package no.nb.nifi.tekst.processors
 
-import io.minio.MinioClient
 import io.mockk.every
-import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import no.nb.nifi.tekst.util.S3ClientFactory
@@ -95,11 +93,13 @@ class DeleteMinioFileTest : MinIOTestBase() {
 
     @Test
     fun `routes flowfile to failure when S3 client throws`() {
-        val failingClient = mockk<MinioClient>(relaxed = true)
-        every { failingClient.listObjects(any()) } throws RuntimeException("Simulated S3 failure")
-
+        // Inject the failure at the client-factory level so the test does not depend on
+        // which MinIO call (listObjects / statObject / removeObjects / ...) the
+        // deletion implementation happens to invoke first.
         mockkObject(S3ClientFactory)
-        every { S3ClientFactory.getS3Client(any(), any(), any(), any()) } returns failingClient
+        every {
+            S3ClientFactory.getS3Client(any(), any(), any(), any())
+        } throws RuntimeException("Simulated S3 failure")
 
         runner.enqueue("".toByteArray())
         runner.run()
