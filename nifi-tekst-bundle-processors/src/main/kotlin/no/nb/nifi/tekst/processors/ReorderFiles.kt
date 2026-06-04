@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.minio.MinioClient
 import no.nb.models.ProcessChangesResult
 import no.nb.models.RenameInstruction
+import no.nb.utils.PathSafety.isSafeName
+import no.nb.utils.PathSafety.requireWithinBaseDir
 import no.nb.utils.RenameDiskUtils.renameFilesOnDisk
-import no.nb.utils.RenameS3Utils.deleteAllKeysWithPrefix
+import no.nb.utils.S3Utils.deleteAllKeysWithPrefix
 import no.nb.utils.RenameS3Utils.renameS3Files
 import no.nb.nifi.tekst.util.S3ClientFactory.getS3Client
 import no.nb.utils.RenameUtils.extractIdFromFilename
@@ -149,33 +151,6 @@ class ReorderFiles(
 
     public override fun getSupportedPropertyDescriptors(): List<PropertyDescriptor> = descriptors
 
-    /**
-     * Validates that a name is safe to use as a path component.
-     * Disallows path traversal sequences and path separator characters.
-     */
-    private fun isSafeName(name: String): Boolean {
-        val safe = name.isNotBlank() &&
-                !name.contains("..") &&
-                !name.contains("/") &&
-                !name.contains("\\") &&
-                !name.contains("\u0000")
-        if (!safe) {
-            logger.warn("Validation failed for name: '{}'", name)
-        }
-        return safe
-    }
-
-    /**
-     * Ensures the resolved path is strictly within the base directory.
-     * Throws SecurityException if path traversal is detected.
-     */
-    private fun requireWithinBaseDir(baseDirPath: Path, resolvedPath: Path) {
-        val normalized = resolvedPath.normalize()
-        if (!normalized.startsWith(baseDirPath.normalize())) {
-            logger.error("Path traversal detected: {} is outside base directory {}", resolvedPath, baseDirPath)
-            throw SecurityException("Path traversal detected: $resolvedPath is outside base directory $baseDirPath")
-        }
-    }
 
     /** Example of entries when ItemId=ID1 and zeroPadding="%02d"
      * entries: [
