@@ -18,6 +18,7 @@ import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
 import org.apache.nifi.annotation.documentation.CapabilityDescription
 import org.apache.nifi.annotation.documentation.Tags
 import org.apache.nifi.components.PropertyDescriptor
+import org.apache.nifi.components.Validator
 import org.apache.nifi.expression.ExpressionLanguageScope
 import org.apache.nifi.flowfile.FlowFile
 import org.apache.nifi.processor.*
@@ -82,9 +83,9 @@ class ReorderFiles(
         val PREFIX: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("prefix")
             .displayName("Prefix")
-            .description("Prefix (folder-like) in S3 placed before tekst_<itemId>/ for the files being reordered.")
-            .required(true)
-            .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+            .description("Optional prefix (folder-like) in S3 placed before tekst_<itemId>/. May be empty.")
+            .required(false)
+            .addValidator(Validator.VALID)
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .build()
 

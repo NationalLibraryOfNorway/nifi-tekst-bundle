@@ -87,7 +87,6 @@ class DeleteMinioFile : AbstractProcessor() {
 
     public override fun getSupportedPropertyDescriptors(): List<PropertyDescriptor> = descriptors
 
-
     override fun onTrigger(context: ProcessContext, session: ProcessSession) {
         val flowFile: FlowFile = session.get() ?: return
 
