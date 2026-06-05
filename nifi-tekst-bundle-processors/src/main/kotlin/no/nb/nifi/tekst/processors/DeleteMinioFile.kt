@@ -20,7 +20,7 @@ import java.util.*
 @SupportsSensitiveDynamicProperties
 @Tags("NB", "Tekst", "Text", "Delete", "Files")
 @CapabilityDescription(
-    "A nifi processor that recursively deletes all files under tekst_<itemId>/ in a MinIO/S3 bucket."
+    "Recursively deletes all files under tekst_<itemId>/ in a MinIO/S3 bucket."
 )
 class DeleteMinioFile : AbstractProcessor() {
 

@@ -33,7 +33,7 @@ import java.util.*
 @SupportsSensitiveDynamicProperties
 @Tags("NB", "Tekst", "Text", "Order", "Files")
 @CapabilityDescription(
-    "A nifi processor that reorders/renames files in access and primary folders"
+    "Reorders/renames files in access and primary folders."
 )
 
 class ReorderFiles(
