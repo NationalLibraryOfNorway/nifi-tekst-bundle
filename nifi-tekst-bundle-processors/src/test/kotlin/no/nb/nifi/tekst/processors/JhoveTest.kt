@@ -34,6 +34,7 @@ class JhoveTest {
         TestObjectFolderHelper.deleteTempObjectFolder(objectFolder)
     }
 
+    // Covers the fallback path: no dynamic properties configured → FOLDER_MAPPINGS defaults are used
     @Test
     fun testValidProcessingCreatesJhoveOutputs() {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
@@ -108,6 +109,31 @@ class JhoveTest {
         } finally {
             noAccessFolder.toFile().deleteRecursively()
         }
+    }
+
+    @Test
+    fun testDynamicMappingsReplaceDefaults() {
+        val runner = TestRunners.newTestRunner(Jhove::class.java)
+        runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
+
+        // Dynamic property: name = source subfolder, value = custom target subfolder
+        runner.setProperty("representations/primary/data", "custom/jhove/test-output")
+
+        runner.enqueue("test")
+        runner.run()
+
+        assertProcessed(runner)
+
+        // Custom target must have JHOVE output
+        val customOutputDir = objectFolder.resolve("custom/jhove/test-output").toFile()
+        assertTrue(customOutputDir.exists(), "Custom dynamic target dir should exist")
+        val xmlFiles = customOutputDir.listFiles { f -> f.name.endsWith(".xml") }
+        assertNotNull(xmlFiles, "Custom target dir should contain files")
+        assertTrue(xmlFiles!!.isNotEmpty(), "Custom target dir should contain at least one JHOVE XML file")
+
+        // Default-only folder must NOT be created (replace, not merge)
+        val defaultDescriptiveDir = objectFolder.resolve("metadata/other/jhove").toFile()
+        assertFalse(defaultDescriptiveDir.exists(), "Default mapping folder should not be created when dynamic props are set")
     }
 
     private fun copyDir(source: Path, target: Path) {
