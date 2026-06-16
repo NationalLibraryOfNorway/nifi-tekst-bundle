@@ -81,9 +81,9 @@ class Jhove : AbstractProcessor() {
         private val FOLDER_MAPPINGS = mapOf(
 			"metadata/descriptive" to "metadata/other/jhove",
             "representations/primary/data" to "representations/primary/metadata/technical/jhove",
-            "representations/primary/metadata/other/ocr" to "representations/primary/metadata/other/jhove-ocr",
-            "representations/access/data" to "representations/access/metadata/technical/jhove",
-			"representations/access/metadata/other/ocr" to "representations/access/metadata/other/jhove-ocr"
+            "representations/primary/metadata/other/ocr-for-transformed" to "representations/primary/metadata/other/jhove-ocr-for-transformed",
+			"representations/primary/metadata/other/transformation" to "representations/primary/metadata/other/jhove-transformation",
+			"representations/access/data" to "representations/access/metadata/technical/jhove",
         )
 
         // File type to JHOVE module mapping
