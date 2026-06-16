@@ -40,7 +40,7 @@ def largest_rotated_rect(w: int, h: int, angle: float):
     alpha = (sign_alpha % math.pi + math.pi) % math.pi
     bb_w = w * math.cos(alpha) + h * math.sin(alpha)
     bb_h = w * math.sin(alpha) + h * math.cos(alpha)
-    gamma = math.atan2(bb_w, bb_w) if (w < h) else math.atan2(bb_w, bb_w)
+    gamma = math.atan2(bb_w, bb_h) if (w < h) else math.atan2(bb_h, bb_w)
     delta = math.pi - alpha - gamma
     length = h if (w < h) else w
     d = length * math.cos(alpha)

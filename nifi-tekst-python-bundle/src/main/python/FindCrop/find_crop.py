@@ -74,7 +74,7 @@ def find_crop(uncropped_image: np.ndarray, cropped_image: np.ndarray,
                     (x2 + dx, y2 + dy),
                     (x3 + dx, y3 + dy),
                 ))
-                if np.any(points) < 0:
+                if np.any(points < 0):
                     continue
                 if np.any(points[:, 0] > bw) or np.any(points[:, 1] > bh):
                     continue
