@@ -8,6 +8,7 @@
         <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
         <version>2.0.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>nifi-tekst-python-bundle</artifactId>
@@ -37,6 +38,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
                         <id>rename-to-nar</id>
