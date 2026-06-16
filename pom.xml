@@ -37,6 +37,7 @@
     <modules>
         <module>nifi-tekst-bundle-processors</module>
         <module>nifi-tekst-bundle-nar</module>
+        <module>nifi-tekst-python-bundle</module>
     </modules>
 
     <dependencyManagement>

@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Nar-Id: nifi-tekst-python-bundle
+Nar-Group: no.nb.nifi
+Nar-Version: ${project.version}
