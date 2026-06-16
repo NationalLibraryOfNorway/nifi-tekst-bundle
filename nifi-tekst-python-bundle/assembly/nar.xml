@@ -15,6 +15,10 @@
         <fileSet>
             <directory>src/main/python/FindCrop</directory>
             <outputDirectory>/FindCrop</outputDirectory>
+            <excludes>
+                <exclude>**/__pycache__/**</exclude>
+                <exclude>**/*.pyc</exclude>
+            </excludes>
         </fileSet>
     </fileSets>
 </assembly>
