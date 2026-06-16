@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class DeleteMinioFileTest : MinIOTestBase() {
+class DeleteAllS3ObjectsByPrefixTest : MinIOTestBase() {
 
     private lateinit var runner: TestRunner
 
@@ -32,14 +32,14 @@ class DeleteMinioFileTest : MinIOTestBase() {
     }
 
     private fun setupTestRunner(includePrefix: Boolean): TestRunner =
-        TestRunners.newTestRunner(DeleteMinioFile()).apply {
-            setProperty(DeleteMinioFile.ITEM_ID, itemId)
-            setProperty(DeleteMinioFile.ENDPOINT, s3Endpoint)
-            setProperty(DeleteMinioFile.BUCKET, BUCKET)
-            setProperty(DeleteMinioFile.ACCESS_KEY, s3AccessKey)
-            setProperty(DeleteMinioFile.SECRET_KEY, s3SecretKey)
-            setProperty(DeleteMinioFile.REGION, REGION)
-            if (includePrefix) setProperty(DeleteMinioFile.PREFIX, testPrefix)
+        TestRunners.newTestRunner(DeleteAllS3ObjectsByPrefix()).apply {
+            setProperty(DeleteAllS3ObjectsByPrefix.ITEM_ID, itemId)
+            setProperty(DeleteAllS3ObjectsByPrefix.ENDPOINT, s3Endpoint)
+            setProperty(DeleteAllS3ObjectsByPrefix.BUCKET, BUCKET)
+            setProperty(DeleteAllS3ObjectsByPrefix.ACCESS_KEY, s3AccessKey)
+            setProperty(DeleteAllS3ObjectsByPrefix.SECRET_KEY, s3SecretKey)
+            setProperty(DeleteAllS3ObjectsByPrefix.REGION, REGION)
+            if (includePrefix) setProperty(DeleteAllS3ObjectsByPrefix.PREFIX, testPrefix)
             assertValid()
         }
 
@@ -61,7 +61,7 @@ class DeleteMinioFileTest : MinIOTestBase() {
         runner.enqueue("".toByteArray())
         runner.run()
 
-        runner.assertAllFlowFilesTransferred(DeleteMinioFile.REL_SUCCESS, 1)
+        runner.assertAllFlowFilesTransferred(DeleteAllS3ObjectsByPrefix.REL_SUCCESS, 1)
         targetKeys.forEach {
             assertFalse(keyExists(it), "Key should have been deleted: $it")
         }
@@ -84,7 +84,7 @@ class DeleteMinioFileTest : MinIOTestBase() {
         runner.enqueue("".toByteArray())
         runner.run()
 
-        runner.assertAllFlowFilesTransferred(DeleteMinioFile.REL_SUCCESS, 1)
+        runner.assertAllFlowFilesTransferred(DeleteAllS3ObjectsByPrefix.REL_SUCCESS, 1)
         targetKeys.forEach {
             assertFalse(keyExists(it), "Key should have been deleted: $it")
         }
@@ -104,7 +104,7 @@ class DeleteMinioFileTest : MinIOTestBase() {
         runner.enqueue("".toByteArray())
         runner.run()
 
-        runner.assertAllFlowFilesTransferred(DeleteMinioFile.REL_FAILURE, 1)
+        runner.assertAllFlowFilesTransferred(DeleteAllS3ObjectsByPrefix.REL_FAILURE, 1)
     }
 }
 

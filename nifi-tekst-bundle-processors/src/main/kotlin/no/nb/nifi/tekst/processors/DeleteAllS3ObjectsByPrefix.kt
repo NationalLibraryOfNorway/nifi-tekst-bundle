@@ -20,19 +20,19 @@ import java.util.*
 @SupportsSensitiveDynamicProperties
 @Tags("NB", "Tekst", "Text", "Delete", "Files")
 @CapabilityDescription(
-    "Recursively deletes all files under tekst_<itemId>/ in a MinIO/S3 bucket."
+    "Deletes all objects/files under tekst_<itemId>/ prefix in a S3 bucket."
 )
-class DeleteMinioFile : AbstractProcessor() {
+class DeleteAllS3ObjectsByPrefix : AbstractProcessor() {
 
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
     private var relationships: MutableSet<Relationship> = mutableSetOf()
-    private val log = LoggerFactory.getLogger(DeleteMinioFile::class.java)
+    private val log = LoggerFactory.getLogger(DeleteAllS3ObjectsByPrefix::class.java)
 
     companion object {
         val ITEM_ID: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("item_id")
             .displayName("Item ID")
-            .description("Item id whose folder (tekst_<itemId>/) will be recursively deleted in the bucket.")
+            .description("Item id whose folder (tekst_<itemId>/) will be deleted by prefix in the bucket.")
             .required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
