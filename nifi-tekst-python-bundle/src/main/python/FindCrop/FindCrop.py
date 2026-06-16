@@ -1,7 +1,7 @@
 import cv2
 
 from nifiapi.flowfiletransform import FlowFileTransform, FlowFileTransformResult
-from nifiapi.properties import PropertyDescriptor, StandardValidators
+from nifiapi.properties import PropertyDescriptor, StandardValidators, ExpressionLanguageScope
 
 from .find_crop import find_crop
 from .xmp_utils import transform_corners_to_deskewed, build_xmp
@@ -28,11 +28,13 @@ class FindCrop(FlowFileTransform):
             name='Uncropped Image Path',
             description='Absolute path to the uncropped source image.',
             required=True,
+            expression_language_scope=ExpressionLanguageScope.FLOWFILE_ATTRIBUTES,
         )
         self.cropped_path_prop = PropertyDescriptor(
             name='Cropped Image Path',
             description='Absolute path to the cropped image to locate within the uncropped image.',
             required=True,
+            expression_language_scope=ExpressionLanguageScope.FLOWFILE_ATTRIBUTES,
         )
         self.resize_factor_prop = PropertyDescriptor(
             name='Resize Factor',

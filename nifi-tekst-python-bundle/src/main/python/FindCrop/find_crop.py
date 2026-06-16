@@ -62,10 +62,10 @@ def find_crop(uncropped_image: np.ndarray, cropped_image: np.ndarray,
                 x3, y3 = x0,      y0 + sh
 
                 ox, oy = cw / 2, ch / 2
-                x0, y0 = rotate_point(x0, y0, ox, oy, rot)
-                x1, y1 = rotate_point(x1, y1, ox, oy, rot)
-                x2, y2 = rotate_point(x2, y2, ox, oy, rot)
-                x3, y3 = rotate_point(x3, y3, ox, oy, rot)
+                x0, y0 = rotate_point(x0, y0, ox, oy, -rot)
+                x1, y1 = rotate_point(x1, y1, ox, oy, -rot)
+                x2, y2 = rotate_point(x2, y2, ox, oy, -rot)
+                x3, y3 = rotate_point(x3, y3, ox, oy, -rot)
 
                 dx, dy = (bw - cw) / 2, (bh - ch) / 2
                 points = np.array((
