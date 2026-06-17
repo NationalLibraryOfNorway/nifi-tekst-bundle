@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-class RenameS3UtilsTest : MinIOTestBase() {
+class RenameS3UtilsTest : S3TestBase() {
     val standardFilename= "tekst_019a3aa3-d0af-7658-9a44-5df904c51bec"
     val testPrefix = "NEWSPAPER"
 
@@ -85,7 +85,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
             makeAccessObject(originalName)
             makePrimaryObject(originalName)
 
-            RenameS3Utils.renameS3Files(minioClient, BUCKET, listOf(RenameInstruction(originalName, newName)), testPrefix)
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, listOf(RenameInstruction(originalName, newName)), testPrefix)
             assertTrue(keyExists(accessKey(newName)),
                 "New access key should exist")
             assertTrue(keyExists(primaryKey(newName)),
@@ -107,7 +107,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
             makePrimaryObject(nameB, "content of B")
 
             RenameS3Utils.renameS3Files(
-                minioClient, BUCKET, listOf(
+                s3Client, BUCKET, listOf(
                     RenameInstruction(nameA, nameB),
                     RenameInstruction(nameB, nameA)
                 ), testPrefix
@@ -126,7 +126,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
             val key = accessKey(name)
             makeAccessObject(name)
 
-            RenameS3Utils.renameS3Files(minioClient, BUCKET, listOf(RenameInstruction(name, name)), testPrefix)
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, listOf(RenameInstruction(name, name)), testPrefix)
 
             assertTrue(keyExists(key), "Key should remain untouched when name is unchanged")
         }
@@ -142,7 +142,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
                 makePrimaryObject(instruction.originalName)
             }
 
-            RenameS3Utils.renameS3Files(minioClient, BUCKET, instructions, testPrefix)
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, instructions, testPrefix)
 
             instructions.forEach { instruction ->
                 assertTrue(keyExists(accessKey(instruction.newName)),
@@ -176,7 +176,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
                 )
             }
 
-            RenameS3Utils.renameS3Files(minioClient, BUCKET, instructions, testPrefix)
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, instructions, testPrefix)
 
             // Every file now lives under the target itemId
             pages.forEach { page ->
@@ -205,7 +205,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
             makePrimaryObject("${standardFilename}_00001.tif")
 
             RenameS3Utils.renameS3Files(
-                minioClient, BUCKET,
+                s3Client, BUCKET,
                 listOf(RenameInstruction("${standardFilename}_00001.tif", "${standardFilename}_00002.tif")),
                 testPrefix
             )
@@ -220,7 +220,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
             val key = "${accessKey(standardFilename)}_00001.tif"
             makeAccessObject(fileName)
 
-            RenameS3Utils.renameS3Files(minioClient, BUCKET, emptyList())
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, emptyList())
 
             assertTrue(keyExists(key), "Key should remain untouched when instructions are empty")
             assertEquals(1, listAllKeys().size, "Bucket should be unchanged")
@@ -246,7 +246,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
             )
 
             assertThrows(IllegalArgumentException::class.java) {
-                RenameS3Utils.renameS3Files(minioClient, BUCKET, instructions, testPrefix)
+                RenameS3Utils.renameS3Files(s3Client, BUCKET, instructions, testPrefix)
             }
 
             // All temp keys should be cleaned up after rollback
@@ -265,7 +265,7 @@ class RenameS3UtilsTest : MinIOTestBase() {
             // No keys are put in the bucket — all instructions will fail
             assertThrows(IllegalStateException::class.java) {
                 RenameS3Utils.renameS3Files(
-                    minioClient, BUCKET,
+                    s3Client, BUCKET,
                     listOf(RenameInstruction("${standardFilename}_00001.tif", "${standardFilename}_00002.tif")),
                     testPrefix
                 )

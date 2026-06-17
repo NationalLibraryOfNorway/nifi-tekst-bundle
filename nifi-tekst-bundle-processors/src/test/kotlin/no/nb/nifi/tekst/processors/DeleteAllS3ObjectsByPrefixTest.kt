@@ -4,7 +4,7 @@ import io.mockk.every
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import no.nb.nifi.tekst.util.S3ClientFactory
-import no.nb.utils.MinIOTestBase
+import no.nb.utils.S3TestBase
 import org.apache.nifi.util.TestRunner
 import org.apache.nifi.util.TestRunners
 import org.junit.jupiter.api.AfterEach
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class DeleteAllS3ObjectsByPrefixTest : MinIOTestBase() {
+class DeleteAllS3ObjectsByPrefixTest : S3TestBase() {
 
     private lateinit var runner: TestRunner
 
@@ -94,7 +94,7 @@ class DeleteAllS3ObjectsByPrefixTest : MinIOTestBase() {
     @Test
     fun `routes flowfile to failure when S3 client throws`() {
         // Inject the failure at the client-factory level so the test does not depend on
-        // which MinIO call (listObjects / statObject / removeObjects / ...) the
+        // which s3 call (listObjects / statObject / removeObjects / ...) the
         // deletion implementation happens to invoke first.
         mockkObject(S3ClientFactory)
         every {

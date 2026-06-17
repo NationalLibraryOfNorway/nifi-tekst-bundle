@@ -8,7 +8,7 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import no.nb.nifi.tekst.util.S3ClientFactory
-import no.nb.utils.MinIOTestBase
+import no.nb.utils.S3TestBase
 import no.nb.utils.TestFileUtils
 import no.nb.utils.TestFileUtils.createDiskFiles
 import no.nb.utils.TestFileUtils.createOcrFiles
@@ -27,7 +27,7 @@ import java.nio.file.Path
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 
-class ReorderFilesTest : MinIOTestBase() {
+class ReorderFilesTest : S3TestBase() {
     private val reorderFiles = ReorderFiles()
     private val mapper = ObjectMapper()
     private lateinit var runner: TestRunner

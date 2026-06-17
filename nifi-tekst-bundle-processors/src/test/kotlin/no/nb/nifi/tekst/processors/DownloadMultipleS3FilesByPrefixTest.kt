@@ -1,6 +1,6 @@
 package no.nb.nifi.tekst.processors
 
-import no.nb.utils.MinIOTestBase
+import no.nb.utils.S3TestBase
 import org.apache.nifi.util.TestRunner
 import org.apache.nifi.util.TestRunners
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -11,7 +11,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path
 
-class DownloadMultipleS3FilesByPrefixTest : MinIOTestBase() {
+class DownloadMultipleS3FilesByPrefixTest : S3TestBase() {
 
     @BeforeEach
     fun uploadTestFiles() {
@@ -35,7 +35,7 @@ class DownloadMultipleS3FilesByPrefixTest : MinIOTestBase() {
             setProperty(DownloadMultipleS3FilesByPrefix.ACCESS_KEY, s3AccessKey)
             setProperty(DownloadMultipleS3FilesByPrefix.SECRET_KEY, s3SecretKey)
             setProperty(DownloadMultipleS3FilesByPrefix.ENDPOINT, s3Endpoint)
-            setProperty(DownloadMultipleS3FilesByPrefix.REGION, REGION) // now using MinIOTestBase.REGION
+            setProperty(DownloadMultipleS3FilesByPrefix.REGION, REGION) // now using S3TestBase.REGION
         }
 
     @Test
