@@ -55,6 +55,14 @@ Denne flowen skal vi bruke for lokal utvikling, og du kan bruke volume mountene 
 | `./nifi-tekst-bundle-processors/src/test/resources` | `/data/test-resources`                  | Testfiler for utvikling og testing (read-only)    |
 | `./nifi-docker/output`                              | `/data/output`                          | Mappe for output fra NiFi-flows                   |
 
+Testfiler fra `nifi-tekst-bundle-processors/src/test/resources` er tilgjengelig i containeren under `/data/test-resources` og kan brukes direkte som input når du tester prosessorer manuelt i NiFi.
+
+For å nullstille testressurser til opprinnelig tilstand (fjerner også genererte filer som er gitignorert):
+
+```bash
+git clean -fdx nifi-tekst-bundle-processors/src/test/resources/
+```
+
 ### Rebuild etter endringer
 
 Etter endringer i prosessor-koden:
@@ -69,6 +77,12 @@ docker compose restart nifi
 Utrulling skjer via opplastning til Artifactory, og deretter nedlastning fra NiFi i stage/prod miljøene.
 
 Bruk NiFi flowen "Update NAR Packages"
+
+## Versjonering
+
+Bundle-versjonen (den som vises i NiFi når du legger til en prosessor) styres fra én plass: `<revision>` i rot-`pom.xml`. Undermodulene arver denne via `${revision}`.
+
+For å bumpe versjonen, endre bare `<revision>` i `pom.xml`.
 
 ## Vedlikehold
 

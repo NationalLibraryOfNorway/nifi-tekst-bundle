@@ -1,4 +1,6 @@
 target/
+.flattened-pom.xml
+docs/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
