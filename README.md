@@ -66,9 +66,20 @@ docker compose restart nifi
 
 ## Utrulling
 
-Utrulling skjer via opplastning til Artifactory, og deretter nedlastning fra NiFi i stage/prod miljøene.
+Utrulling utløses ved å sette en tag og pushe den til GitHub. Dette trigger CI-pipelinen som laster opp NAR-filen til Artifactory, og deretter kan den lastes ned fra NiFi i stage/prod miljøene.
 
-Bruk NiFi flowen "Update NAR Packages"
+Vi bruker [semantisk versjonering](https://semver.org/) på formatet `vx.y.z`:
+
+- **MAJOR** (`x`) – Økes når det gjøres endringer som **ikke er bakoverkompatible** (f.eks. `v2.0.0`)
+- **MINOR** (`y`) – Økes når det legges til **nye funksjoner som er bakoverkompatible** (f.eks. `v1.1.0`)
+- **PATCH** (`z`) – Økes når det gjøres **bakoverkompatible feilrettinger** eller oppdateringer (f.eks. `v1.0.1`)
+
+```bash
+git tag vx.y.z
+git push origin vx.y.z
+```
+
+Bruk deretter NiFi flowen "Update NAR Packages" for å laste ned den nye versjonen i stage/prod.
 
 ## Vedlikehold
 
