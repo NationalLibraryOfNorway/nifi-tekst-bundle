@@ -5,16 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.minio.MinioClient
 import no.nb.models.ProcessChangesResult
 import no.nb.models.RenameInstruction
+import no.nb.utils.PathSafety.isSafeName
+import no.nb.utils.PathSafety.requireWithinBaseDir
 import no.nb.utils.RenameDiskUtils.renameFilesOnDisk
-import no.nb.utils.RenameS3Utils.deleteAllKeysWithPrefix
+import no.nb.utils.S3Utils.deleteAllKeysWithPrefix
 import no.nb.utils.RenameS3Utils.renameS3Files
 import no.nb.nifi.tekst.util.S3ClientFactory.getS3Client
+import no.nb.nifi.tekst.util.S3PropertyDescriptors
 import no.nb.utils.RenameUtils.extractIdFromFilename
 import no.nb.utils.UUIDv7
 import org.apache.nifi.annotation.behavior.SupportsSensitiveDynamicProperties
 import org.apache.nifi.annotation.documentation.CapabilityDescription
 import org.apache.nifi.annotation.documentation.Tags
 import org.apache.nifi.components.PropertyDescriptor
+import org.apache.nifi.components.Validator
 import org.apache.nifi.expression.ExpressionLanguageScope
 import org.apache.nifi.flowfile.FlowFile
 import org.apache.nifi.processor.*
@@ -29,7 +33,7 @@ import java.util.*
 @SupportsSensitiveDynamicProperties
 @Tags("NB", "Tekst", "Text", "Order", "Files")
 @CapabilityDescription(
-    "A nifi processor that reorders/renames files in access and primary folders"
+    "Reorders/renames files in access and primary folders."
 )
 
 class ReorderFiles(
@@ -70,57 +74,18 @@ class ReorderFiles(
             .name("failure")
             .build()
 
-        val BUCKET: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("bucket")
-                .displayName("S3 bucket")
-                .description("S3 bucket name")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
-
-        val ACCESS_KEY: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("access_key")
-                .displayName("S3 access key")
-                .description("S3 access key")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
-
-        val SECRET_KEY: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("secret_key")
-                .displayName("S3 secret key")
-                .description("S3 secret key")
-                .required(true)
-                .sensitive(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .build()
-
-        val REGION: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("region")
-                .displayName("S3 region")
-                .description("S3 region")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
-
-        val ENDPOINT: PropertyDescriptor = PropertyDescriptor.Builder()
-                .name("endpoint")
-                .displayName("Endpoint")
-                .description("S3 endpoint (url)")
-                .required(true)
-                .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-                .build()
+        val BUCKET: PropertyDescriptor = S3PropertyDescriptors.BUCKET
+        val ACCESS_KEY: PropertyDescriptor = S3PropertyDescriptors.ACCESS_KEY
+        val SECRET_KEY: PropertyDescriptor = S3PropertyDescriptors.SECRET_KEY
+        val REGION: PropertyDescriptor = S3PropertyDescriptors.REGION
+        val ENDPOINT: PropertyDescriptor = S3PropertyDescriptors.ENDPOINT
 
         val PREFIX: PropertyDescriptor = PropertyDescriptor.Builder()
             .name("prefix")
             .displayName("Prefix")
-            .description("Prefix (folder-like) in S3 that contains the files to download")
-            .required(true)
-            .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+            .description("Optional prefix (folder-like) in S3 placed before tekst_<itemId>/. May be empty.")
+            .required(false)
+            .addValidator(Validator.VALID)
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .build()
 
@@ -149,33 +114,6 @@ class ReorderFiles(
 
     public override fun getSupportedPropertyDescriptors(): List<PropertyDescriptor> = descriptors
 
-    /**
-     * Validates that a name is safe to use as a path component.
-     * Disallows path traversal sequences and path separator characters.
-     */
-    private fun isSafeName(name: String): Boolean {
-        val safe = name.isNotBlank() &&
-                !name.contains("..") &&
-                !name.contains("/") &&
-                !name.contains("\\") &&
-                !name.contains("\u0000")
-        if (!safe) {
-            logger.warn("Validation failed for name: '{}'", name)
-        }
-        return safe
-    }
-
-    /**
-     * Ensures the resolved path is strictly within the base directory.
-     * Throws SecurityException if path traversal is detected.
-     */
-    private fun requireWithinBaseDir(baseDirPath: Path, resolvedPath: Path) {
-        val normalized = resolvedPath.normalize()
-        if (!normalized.startsWith(baseDirPath.normalize())) {
-            logger.error("Path traversal detected: {} is outside base directory {}", resolvedPath, baseDirPath)
-            throw SecurityException("Path traversal detected: $resolvedPath is outside base directory $baseDirPath")
-        }
-    }
 
     /** Example of entries when ItemId=ID1 and zeroPadding="%02d"
      * entries: [

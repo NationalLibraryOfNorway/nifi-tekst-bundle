@@ -1,6 +1,7 @@
 package no.nb.utils
 
 import no.nb.models.RenameInstruction
+import no.nb.utils.PathSafety.requireWithinBaseDir
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -18,12 +19,6 @@ object RenameDiskUtils {
         val finalName: String
     ) {
         val finalPath: Path get() = targetDir.resolve(finalName).normalize()
-    }
-
-    private fun requireWithinBaseDir(baseDir: Path, path: Path) {
-        require(path.normalize().startsWith(baseDir.normalize())) {
-            "Path traversal detected: $path is outside base directory $baseDir"
-        }
     }
 
     private fun deleteTempDir(tempDir: Path) {

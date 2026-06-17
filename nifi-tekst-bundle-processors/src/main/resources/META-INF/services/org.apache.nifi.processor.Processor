@@ -17,3 +17,4 @@ no.nb.nifi.tekst.processors.GenerateJsonFromProps
 no.nb.nifi.tekst.processors.Jhove
 no.nb.nifi.tekst.processors.CreateMetsBrowsing
 no.nb.nifi.tekst.processors.ReorderFiles
+no.nb.nifi.tekst.processors.DeleteAllS3ObjectsByPrefix

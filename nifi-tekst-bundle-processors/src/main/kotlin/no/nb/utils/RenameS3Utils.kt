@@ -1,16 +1,12 @@
 package no.nb.utils
 
-import io.minio.CopyObjectArgs
-import io.minio.CopySource
-import io.minio.ListObjectsArgs
 import io.minio.MinioClient
-import io.minio.RemoveObjectArgs
-import io.minio.RemoveObjectsArgs
-import io.minio.StatObjectArgs
-import io.minio.errors.ErrorResponseException
-import io.minio.messages.DeleteObject
 import no.nb.models.RenameInstruction
 import no.nb.utils.RenameUtils.extractIdFromFilename
+import no.nb.utils.S3Utils.batchDelete
+import no.nb.utils.S3Utils.rollbackDelete
+import no.nb.utils.S3Utils.copyObjectWithinBucket
+import no.nb.utils.S3Utils.keyExists
 import org.slf4j.LoggerFactory
 
 object RenameS3Utils {
@@ -117,112 +113,7 @@ object RenameS3Utils {
         logger.info("S3 rename complete — ${effectiveRenames.size} instructions processed, ${originalKeysToDelete.size} original keys deleted from bucket '$bucket'")
     }
 
-    /**
-     * Returns true if the given key exists in the bucket, false if not found.
-     * Any other S3 error (permissions, network) is rethrown.
-     */
-    private fun keyExists(client: MinioClient, bucket: String, key: String): Boolean =
-        try {
-            client.statObject(
-                StatObjectArgs.builder().bucket(bucket).`object`(key).build()
-            )
-            true
-        } catch (e: ErrorResponseException) {
-            if (e.errorResponse().code() == "NoSuchKey") false else throw e
-        }
-
-    /**
-     * Copies a single object within the same bucket.
-     */
-    private fun copyObjectWithinBucket(client: MinioClient, bucket: String, sourceKey: String, destKey: String) {
-        client.copyObject(
-            CopyObjectArgs.builder()
-                .bucket(bucket)
-                .`object`(destKey)
-                .source(
-                    CopySource.builder()
-                        .bucket(bucket)
-                        .`object`(sourceKey)
-                        .build()
-                )
-                .build()
-        )
-    }
-
-    /**
-     * Deletes a list of keys one by one, logging each deletion.
-     * Used for rollback where we want to attempt all deletions even if one fails.
-     */
-    private fun rollbackDelete(client: MinioClient, bucket: String, keys: List<String>) {
-        keys.forEach { key ->
-            try {
-                client.removeObject(
-                    RemoveObjectArgs.builder().bucket(bucket).`object`(key).build()
-                )
-                logger.warn("Rollback deleted temp key '$key' from bucket '$bucket'")
-            } catch (e: Exception) {
-                logger.error("Rollback failed to delete '$key' from bucket '$bucket'", e)
-            }
-        }
-    }
-
-    /**
-     * Deletes a list of keys in batches of 1000 (S3 API limit per request).
-     * Used for bulk cleanup of original and temp keys after a successful rename.
-     */
-    private fun batchDelete(client: MinioClient, bucket: String, keys: List<String>) {
-        if (keys.isEmpty()) {
-            logger.debug("No keys to delete in bucket '$bucket'")
-            return
-        }
-
-        val allErrors = mutableListOf<String>()
-
-        keys.chunked(1000).forEach { chunk ->
-            val deleteObjects = chunk.map { DeleteObject(it) }
-            val results = client.removeObjects(
-                RemoveObjectsArgs.builder()
-                    .bucket(bucket)
-                    .objects(deleteObjects)
-                    .build()
-            )
-            results.forEach { result ->
-                val error = result.get()
-                val msg = "'${error.objectName()}': ${error.message()}"
-                logger.error("Failed to delete key $msg from bucket '$bucket'")
-                allErrors.add(msg)
-            }
-        }
-
-        if (allErrors.isNotEmpty()) {
-            throw RuntimeException(
-                "Failed to delete ${allErrors.size} key(s) from bucket '$bucket': " +
-                        allErrors.joinToString()
-            )
-        }
-
-        logger.debug("Deleted ${keys.size} keys from bucket '$bucket'")
-    }
-
     private fun buildKey(prefix: String?, itemId: String, representation: String, filename: String): String =
         if (prefix.isNullOrBlank()) "$itemId/$representation/$filename"
         else "$prefix/$itemId/$representation/$filename"
-
-    /**
-     * Deletes all keys in the bucket that share a common prefix.
-     * Used to clean up an itemId's entire folder when all its files have been moved away.
-     */
-    fun deleteAllKeysWithPrefix(client: MinioClient, bucket: String, keyPrefix: String) {
-        val keys = client.listObjects(
-            ListObjectsArgs.builder().bucket(bucket).prefix(keyPrefix).recursive(true).build()
-        ).map { it.get().objectName() }
-
-        if (keys.isEmpty()) {
-            logger.debug("No keys found with prefix '$keyPrefix' in bucket '$bucket'")
-            return
-        }
-
-        logger.info("Deleting ${keys.size} keys with prefix '$keyPrefix' from bucket '$bucket'")
-        batchDelete(client, bucket, keys)
-    }
 }

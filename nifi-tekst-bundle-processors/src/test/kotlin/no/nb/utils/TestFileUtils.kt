@@ -66,7 +66,7 @@ object TestFileUtils {
      */
     fun createS3Files(
         changes: JsonNode,
-        minioTestBase: MinIOTestBase,
+        s3TestBase: S3TestBase,
         prefix: String
     ): List<String> {
         val createdKeys = mutableListOf<String>()
@@ -80,8 +80,8 @@ object TestFileUtils {
 
                 val accessKey = "$prefix/$fileItemId/representations/access/data/$fileName"
                 val primaryKey = "$prefix/$fileItemId/representations/primary/data/$fileName"
-                minioTestBase.putObject(accessKey)
-                minioTestBase.putObject(primaryKey)
+                s3TestBase.putObject(accessKey)
+                s3TestBase.putObject(primaryKey)
                 createdKeys.add(accessKey)
                 createdKeys.add(primaryKey)
             }

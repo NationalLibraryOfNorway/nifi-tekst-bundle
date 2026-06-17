@@ -20,25 +20,25 @@ import java.io.ByteArrayInputStream
 import java.time.Duration
 
 @Testcontainers
-abstract class MinIOTestBase {
+abstract class S3TestBase {
 
     companion object {
-        const val MINIO_USER = "minioadmin"
-        const val MINIO_PASSWORD = "minioadmin"
+        const val S3_USER = "s3admin"
+        const val S3_PASSWORD = "s3admin1"
         const val BUCKET = "test-bucket"
         const val REGION = "NBR"
 
         @JvmField
         @Container
-        val minioContainer: GenericContainer<*> = GenericContainer(DockerImageName.parse("minio/minio:RELEASE.2025-04-22T22-12-26Z"))
+        val s3Container: GenericContainer<*> = GenericContainer(DockerImageName.parse("minio/minio:RELEASE.2025-04-22T22-12-26Z"))
             .withExposedPorts(9000)
-            .withEnv("MINIO_ROOT_USER", MINIO_USER)
-            .withEnv("MINIO_ROOT_PASSWORD", MINIO_PASSWORD)
+            .withEnv("MINIO_ROOT_USER", S3_USER)
+            .withEnv("MINIO_ROOT_PASSWORD", S3_PASSWORD)
             .withEnv("MINIO_REGION", REGION)
             .withEnv("MINIO_REGION_NAME", REGION)
             .withCommand("server /data")
             .waitingFor(
-                // Wait until MinIO is actually ready to accept requests
+                // Wait until S3 is actually ready to accept requests
                 HttpWaitStrategy()
                     .forPath("/minio/health/live")
                     .forPort(9000)
@@ -46,21 +46,21 @@ abstract class MinIOTestBase {
             )
     }
 
-    lateinit var minioClient: MinioClient
-    val s3Endpoint get() = "http://${minioContainer.host}:${minioContainer.getFirstMappedPort()}"
-    val s3AccessKey get() = MINIO_USER
-    val s3SecretKey get() = MINIO_PASSWORD
+    lateinit var s3Client: MinioClient
+    val s3Endpoint get() = "http://${s3Container.host}:${s3Container.getFirstMappedPort()}"
+    val s3AccessKey get() = S3_USER
+    val s3SecretKey get() = S3_PASSWORD
 
     @BeforeEach
     fun setUpS3() {
-        minioClient = MinioClient.builder()
+        s3Client = MinioClient.builder()
             .endpoint(s3Endpoint)
-            .credentials(MINIO_USER, MINIO_PASSWORD)
+            .credentials(S3_USER, S3_PASSWORD)
             .region(REGION)
             .build()
 
         try {
-            minioClient.makeBucket(MakeBucketArgs.builder().bucket(BUCKET).build())
+            s3Client.makeBucket(MakeBucketArgs.builder().bucket(BUCKET).build())
         } catch (e: ErrorResponseException) {
             if (e.errorResponse().code() != "BucketAlreadyOwnedByYou") throw e
             // Bucket already exists — this is fine
@@ -71,7 +71,7 @@ abstract class MinIOTestBase {
     fun tearDownS3() {
         val objects = listAllKeys().map { DeleteObject(it) }
         if (objects.isNotEmpty()) {
-            val errors = minioClient.removeObjects(
+            val errors = s3Client.removeObjects(
                 RemoveObjectsArgs.builder()
                     .bucket(BUCKET)
                     .objects(objects)
@@ -93,7 +93,7 @@ abstract class MinIOTestBase {
      * Use this when you need real file content, e.g. images.
      */
     fun uploadTestObject(key: String, filePath: String) {
-        minioClient.uploadObject(
+        s3Client.uploadObject(
             UploadObjectArgs.builder()
                 .bucket(BUCKET)
                 .`object`(key)
@@ -108,7 +108,7 @@ abstract class MinIOTestBase {
      */
     fun putObject(key: String, content: String = "dummy content") {
         val bytes = content.toByteArray()
-        minioClient.putObject(
+        s3Client.putObject(
             PutObjectArgs.builder()
                 .bucket(BUCKET)
                 .`object`(key)
@@ -120,7 +120,7 @@ abstract class MinIOTestBase {
 
     fun keyExists(key: String): Boolean =
         try {
-            minioClient.statObject(
+            s3Client.statObject(
                 StatObjectArgs.builder().bucket(BUCKET).`object`(key).build()
             )
             true
@@ -129,7 +129,7 @@ abstract class MinIOTestBase {
         }
 
     fun listAllKeys(): List<String> =
-        minioClient.listObjects(
+        s3Client.listObjects(
             ListObjectsArgs.builder().bucket(BUCKET).recursive(true).build()
         ).map { it.get().objectName() }
 }
