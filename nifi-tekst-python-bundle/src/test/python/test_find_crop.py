@@ -6,7 +6,7 @@ import math
 import numpy as np
 import cv2
 
-from FindCrop.find_crop import find_crop
+from FindCrop.find_crop import find_crop, _estimate_skew_hough
 from FindCrop.image_utils import rotate_image, rotate_point
 from FindCrop.xmp_utils import transform_corners_to_deskewed
 
@@ -116,12 +116,31 @@ def test_rotate_point_wrong_sign_produces_large_error():
 # ---------------------------------------------------------------------------
 
 def test_find_crop_recovers_known_rotation():
-    """find_crop must detect the applied rotation within ±1°."""
+    """find_crop must detect the applied rotation within ±0.1° with refinement enabled."""
     rotation = 2.0
     uncropped, cropped, _ = make_synthetic_pair(rotation_deg=rotation)
-    result = find_crop(uncropped, cropped, resize_factor=0.3, check_inverted=False)
-    assert abs(result.rotation - rotation) < 1.0, (
-        f"Expected rotation ~{rotation}°, got {result.rotation:.3f}°"
+    result = find_crop(uncropped, cropped, resize_factor=0.3, check_inverted=False,
+                       refine_rotation=True)
+    assert abs(result.rotation - rotation) < 0.1, (
+        f"Expected rotation ~{rotation}°, got {result.rotation:.4f}°"
+    )
+
+
+def test_refinement_improves_rotation_accuracy():
+    """refine_rotation=True must give meaningfully lower error than refine_rotation=False."""
+    rotation = 3.5  # large angle where the coarse grid is sparsest
+    uncropped, cropped, _ = make_synthetic_pair(rotation_deg=rotation)
+    coarse = find_crop(uncropped, cropped, resize_factor=0.3, check_inverted=False,
+                       refine_rotation=False)
+    refined = find_crop(uncropped, cropped, resize_factor=0.3, check_inverted=False,
+                        refine_rotation=True)
+    err_coarse  = abs(coarse.rotation  - rotation)
+    err_refined = abs(refined.rotation - rotation)
+    assert err_refined < err_coarse, (
+        f"Refinement should reduce error: coarse={err_coarse:.4f}° refined={err_refined:.4f}°"
+    )
+    assert err_refined < 0.05, (
+        f"Refined error {err_refined:.4f}° should be under 0.05°"
     )
 
 
@@ -196,3 +215,38 @@ def test_end_to_end_crop_bounds_accuracy():
     assert abs(left - exp_left) < tol, f"left off by {abs(left - exp_left)}px (got {left}, expected ~{exp_left})"
     assert abs(bottom - exp_bottom) < tol, f"bottom off by {abs(bottom - exp_bottom)}px"
     assert abs(right - exp_right) < tol, f"right off by {abs(right - exp_right)}px"
+
+
+# ---------------------------------------------------------------------------
+# Hough estimation
+# ---------------------------------------------------------------------------
+
+def test_hough_returns_none_on_featureless_image():
+    """A uniform image has no detectable lines — Hough must return None."""
+    blank = np.full((400, 600, 3), 128, dtype=np.uint8)
+    assert _estimate_skew_hough(blank) is None
+
+
+def test_hough_detects_near_horizontal_skew():
+    """An image with strong horizontal lines should return an angle near 0°."""
+    img = np.zeros((1000, 1200, 3), dtype=np.uint8)
+    for y in range(80, 1000, 60):
+        cv2.line(img, (0, y), (1200, y), (255, 255, 255), 5)
+    angle = _estimate_skew_hough(img)
+    assert angle is not None, 'Expected a confident Hough estimate on a ruled image'
+    assert abs(angle) < 1.0, f'Expected near 0°, got {angle:.3f}°'
+
+
+def test_find_crop_sets_used_hough_false_when_disabled():
+    """used_hough must be False when use_hough=False."""
+    uncropped, cropped, _ = make_synthetic_pair(rotation_deg=2.0)
+    result = find_crop(uncropped, cropped, resize_factor=0.3,
+                       check_inverted=False, use_hough=False)
+    assert result.used_hough is False
+
+
+def test_find_crop_used_hough_attribute_is_bool():
+    """used_hough on FoundCrop is always a bool."""
+    uncropped, cropped, _ = make_synthetic_pair(rotation_deg=2.0)
+    result = find_crop(uncropped, cropped, resize_factor=0.3, check_inverted=False)
+    assert isinstance(result.used_hough, bool)

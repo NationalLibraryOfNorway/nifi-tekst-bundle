@@ -26,6 +26,25 @@ def transform_corners_to_deskewed(
     return int(min(ys)), int(min(xs)), int(max(ys)), int(max(xs))
 
 
+def snap_bounds_to_known_size(
+    top: int, left: int, bottom: int, right: int,
+    exact_w: int, exact_h: int,
+) -> tuple[int, int, int, int]:
+    """
+    Re-derive crop bounds from the found centre and the exact known dimensions.
+
+    find_crop locates the crop centre accurately, but the bounding box dimensions
+    carry rounding error from the resize-then-unscale pipeline
+    (floor(W * factor) / factor ≠ W).  This function keeps the centre and
+    forces the box to be exactly exact_w × exact_h, eliminating that error.
+    """
+    cx = (left + right) / 2.0
+    cy = (top + bottom) / 2.0
+    new_left   = int(round(cx - exact_w / 2.0))
+    new_top    = int(round(cy - exact_h / 2.0))
+    return new_top, new_left, new_top + exact_h, new_left + exact_w
+
+
 def build_xmp(crop_angle: float, top: int, left: int, bottom: int, right: int) -> str:
     """Return an XMP sidecar string using the Adobe Camera Raw Settings namespace."""
     return (
