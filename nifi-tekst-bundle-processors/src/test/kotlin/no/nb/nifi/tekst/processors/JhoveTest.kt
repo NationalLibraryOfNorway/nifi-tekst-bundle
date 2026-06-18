@@ -48,21 +48,14 @@ class JhoveTest {
 
         val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
         val accessOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
-        val ocrOutputDir = objectFolder.resolve("representations/access/metadata/other/jhove-ocr").toFile()
         val descriptiveOutputDir = objectFolder.resolve("metadata/other/jhove").toFile()
 
         assertTrue(primaryOutputDir.exists(), "Primary JHOVE output dir should exist")
         assertTrue(accessOutputDir.exists(), "Access JHOVE output dir should exist")
-        assertTrue(ocrOutputDir.exists(), "OCR JHOVE output dir should exist")
         assertTrue(descriptiveOutputDir.exists(), "Descriptive JHOVE output dir should exist")
 
         assertEquals(4, primaryOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
         assertEquals(4, accessOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
-        assertEquals(4, ocrOutputDir.listFiles { file ->
-                file.name.endsWith(".xml")
-                        && !file.name.endsWith("mets.xml.xml", ignoreCase = true)
-            }?.size
-        )
         assertEquals(1, descriptiveOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
     }
 
@@ -78,7 +71,7 @@ class JhoveTest {
             )
             copyDir(
                 fixtureRoot.resolve("representations/access/metadata/other/ocr"),
-                noAccessFolder.resolve("representations/primary/metadata/other/ocr")
+                noAccessFolder.resolve("representations/primary/metadata/other/ocr-for-transformed")
             )
 
             val runner = TestRunners.newTestRunner(Jhove::class.java)
@@ -90,20 +83,20 @@ class JhoveTest {
             assertProcessed(runner)
 
             val primaryOcrJhoveDir =
-                noAccessFolder.resolve("representations/primary/metadata/other/jhove-ocr").toFile()
-            assertTrue(primaryOcrJhoveDir.exists(), "Primary OCR JHOVE output dir should exist")
+                noAccessFolder.resolve("representations/primary/metadata/other/jhove-ocr-for-transformed").toFile()
+            assertTrue(primaryOcrJhoveDir.exists(), "Primary OCR-for-transformed JHOVE output dir should exist")
             assertEquals(
                 4,
                 primaryOcrJhoveDir.listFiles { file ->
                     file.name.endsWith(".xml")
                             && !file.name.endsWith("mets.xml.xml", ignoreCase = true)
                 }?.size,
-                "Primary OCR JHOVE output should be generated for every OCR file"
+                "Primary OCR-for-transformed JHOVE output should be generated for every OCR file"
             )
 
             // No access representation present, so no access JHOVE output should be produced.
             assertFalse(
-                noAccessFolder.resolve("representations/access/metadata/other/jhove-ocr").toFile().exists(),
+                noAccessFolder.resolve("representations/access/metadata/other/jhove-ocr-for-transformed").toFile().exists(),
                 "Access OCR JHOVE output dir should not be created when no access representation exists"
             )
         } finally {
