@@ -24,7 +24,12 @@ import javax.xml.xpath.XPathFactory
 @Tags("NB", "Validation", "JHOVE")
 @CapabilityDescription(
     "Validates files in subfolders of an object folder with JHOVE and writes XML output to corresponding target folders. " +
-    "By default validates five standard subfolder pairs (metadata/descriptive, representations/primary/data, etc.). " +
+    "Default folder mappings (source → target): " +
+    "metadata/descriptive → metadata/other/jhove; " +
+    "representations/primary/data → representations/primary/metadata/technical/jhove; " +
+    "representations/primary/metadata/other/ocr-for-transformed → representations/primary/metadata/other/jhove-ocr-for-transformed; " +
+    "representations/primary/metadata/other/transformation → representations/primary/metadata/other/jhove-transformation; " +
+    "representations/access/data → representations/access/metadata/technical/jhove. " +
     "To override, add dynamic properties where the property name is the source subfolder path and the value is the target subfolder path — " +
     "when any dynamic property is present, only dynamic mappings are used (defaults are not merged). " +
     "Note: <mixVersion>1.0</mixVersion> is set in jhoveconf.xml to ensure MIX10-compatible output for CreateMetsBrowsing."
