@@ -23,12 +23,24 @@ import javax.xml.xpath.XPathFactory
 
 @Tags("NB", "Validation", "JHOVE")
 @CapabilityDescription(
-    ("Validates required files in subfolders of an object folder with JHOVE and writes the JHOVE XML output to the corresponding target folders. " +
-            "The processor validates files in defined subfolders, checking all generated XML files to return valid/well-formed statuses. " +
-            "Note that to force XML output compliant with MIX10, and hence compatible with CreateMetsBrowsing, " +
-            "we've added <mixVersion>1.0</mixVersion> to jhoveconf.xml")
+    "Validates files in subfolders of an object folder with JHOVE and writes XML output to corresponding target folders. " +
+    "Default folder mappings (source → target): " +
+    "metadata/descriptive → metadata/other/jhove; " +
+    "representations/primary/data → representations/primary/metadata/technical/jhove; " +
+    "representations/primary/metadata/other/ocr-for-transformed → representations/primary/metadata/other/jhove-ocr-for-transformed; " +
+    "representations/primary/metadata/other/transformation → representations/primary/metadata/other/jhove-transformation; " +
+    "representations/access/data → representations/access/metadata/technical/jhove. " +
+    "To override, add dynamic properties where the property name is the source subfolder path and the value is the target subfolder path — " +
+    "when any dynamic property is present, only dynamic mappings are used (defaults are not merged). " +
+    "Note: <mixVersion>1.0</mixVersion> is set in jhoveconf.xml to ensure MIX10-compatible output for CreateMetsBrowsing."
 )
 @SupportsBatching
+@DynamicProperty(
+    name = "Source subfolder path",
+    value = "Target subfolder path",
+    description = "Maps a source subfolder to a custom JHOVE output target subfolder. When any dynamic property is present, only dynamic mappings are used (defaults are not merged).",
+    expressionLanguageScope = ExpressionLanguageScope.NONE
+)
 class Jhove : AbstractProcessor() {
     private var descriptors: MutableList<PropertyDescriptor> = mutableListOf()
     private var relationships: MutableSet<Relationship> = mutableSetOf()
@@ -74,9 +86,9 @@ class Jhove : AbstractProcessor() {
         private val FOLDER_MAPPINGS = mapOf(
 			"metadata/descriptive" to "metadata/other/jhove",
             "representations/primary/data" to "representations/primary/metadata/technical/jhove",
-            "representations/primary/metadata/other/ocr" to "representations/primary/metadata/other/jhove-ocr",
-            "representations/access/data" to "representations/access/metadata/technical/jhove",
-			"representations/access/metadata/other/ocr" to "representations/access/metadata/other/jhove-ocr"
+            "representations/primary/metadata/other/ocr-for-transformed" to "representations/primary/metadata/other/jhove-ocr-for-transformed",
+			"representations/primary/metadata/other/transformation" to "representations/primary/metadata/other/jhove-transformation",
+			"representations/access/data" to "representations/access/metadata/technical/jhove",
         )
 
         // File type to JHOVE module mapping
@@ -210,6 +222,25 @@ class Jhove : AbstractProcessor() {
 
     override fun getSupportedPropertyDescriptors(): List<PropertyDescriptor> {
         return descriptors
+    }
+
+    override fun getSupportedDynamicPropertyDescriptor(propertyDescriptorName: String): PropertyDescriptor =
+        PropertyDescriptor.Builder()
+            .name(propertyDescriptorName)
+            .displayName(propertyDescriptorName)
+            .description("Target subfolder for JHOVE output from source subfolder '$propertyDescriptorName'")
+            .required(false)
+            .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+            .expressionLanguageSupported(ExpressionLanguageScope.NONE)
+            .dynamic(true)
+            .build()
+
+    private fun effectiveMappings(context: ProcessContext): Map<String, String> {
+        val dynamic = context.properties.entries
+            .filter { it.key.isDynamic }
+            .associate { it.key.name to (it.value ?: "") }
+            .filterValues { it.isNotBlank() }
+        return if (dynamic.isEmpty()) FOLDER_MAPPINGS else dynamic
     }
 
     /**
@@ -440,7 +471,7 @@ class Jhove : AbstractProcessor() {
             val allValidationResults = mutableListOf<FileValidationStatus>()
 
             // Process each configured folder mapping
-            for ((sourceSubfolder, targetSubfolder) in FOLDER_MAPPINGS) {
+            for ((sourceSubfolder, targetSubfolder) in effectiveMappings(context)) {
                 val sourcePath = objectFolder.resolve(sourceSubfolder)
                 val targetPath = objectFolder.resolve(targetSubfolder)
 
