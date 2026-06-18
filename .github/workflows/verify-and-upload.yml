@@ -22,6 +22,7 @@ jobs:
       USE_MAVEN_SETTINGS_FILE: true
       UPLOAD_TO_ARTIFACTORY: true
       USE_GIT_LFS: true
+      INSTALL_UV: true
     secrets:
       VAULT_URL: ${{ secrets.NB_VAULT_URL }}
       VAULT_SECRET_PATH: ${{ secrets.TEKST_VAULT_SECRET_PATH }}

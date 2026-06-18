@@ -87,7 +87,7 @@
                                 <argument>pip</argument>
                                 <argument>install</argument>
                                 <argument>--python</argument>
-                                <argument>3.11</argument>
+                                <argument>3.12</argument>
                                 <argument>--target</argument>
                                 <argument>${project.build.directory}/bundled-deps</argument>
                                 <argument>opencv-python-headless</argument>
