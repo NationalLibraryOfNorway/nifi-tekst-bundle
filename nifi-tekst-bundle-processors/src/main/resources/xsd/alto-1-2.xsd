@@ -35,8 +35,11 @@ with the assistance of Gregor Retti (Unisversity of Innsbruck), Alexander Egger 
 <!-- Modifications of June 30, 2010:
       1. Allowed two versions of spelling of "As in original" because of spelling mistake and for compatibility reason with alto 1.4
 -->
-<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/TR/xlink" elementFormDefault="qualified" attributeFormDefault="unqualified">
-	<xsd:import namespace="http://www.w3.org/TR/xlink" schemaLocation="http://schema.ccs-gmbh.com/METAe/xlink.xsd"/>
+<!-- NB patch: corrected xlink namespace from http://www.w3.org/TR/xlink to
+     http://www.w3.org/1999/xlink, matching the fix made in ALTO 1.3 (2007-06-20).
+     See: https://github.com/altoxml/schema/blob/master/v1/alto-1-3.xsd -->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xsd:import namespace="http://www.w3.org/1999/xlink" schemaLocation="http://schema.ccs-gmbh.com/METAe/xlink.xsd"/>
 	<xsd:element name="alto">
 		<xsd:annotation>
 			<xsd:documentation>ALTO (analyzed layout and text object) stores layout information and 
