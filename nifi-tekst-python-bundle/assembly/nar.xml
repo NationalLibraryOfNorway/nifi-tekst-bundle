@@ -20,5 +20,13 @@
                 <exclude>**/*.pyc</exclude>
             </excludes>
         </fileSet>
+        <fileSet>
+            <directory>target/bundled-deps</directory>
+            <outputDirectory>/NAR-INF/bundled-dependencies</outputDirectory>
+            <excludes>
+                <exclude>**/__pycache__/**</exclude>
+                <exclude>**/*.pyc</exclude>
+            </excludes>
+        </fileSet>
     </fileSets>
 </assembly>

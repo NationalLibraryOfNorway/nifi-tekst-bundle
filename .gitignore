@@ -18,6 +18,9 @@ METS.xml
 ### Other ###
 .sdkmanrc
 
+### NiFi Docker extensions staging ###
+nifi-docker-extensions/
+
 ### NiFi Docker ###
 nifi-docker/output/*
 !nifi-docker/output/README.md

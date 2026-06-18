@@ -4,7 +4,10 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
-from .image_utils import rotate_image, largest_rotated_rect, crop_around_center, rotate_point, resize_image
+try:
+    from .image_utils import rotate_image, largest_rotated_rect, crop_around_center, rotate_point, resize_image
+except ImportError:
+    from image_utils import rotate_image, largest_rotated_rect, crop_around_center, rotate_point, resize_image
 
 
 @dataclass

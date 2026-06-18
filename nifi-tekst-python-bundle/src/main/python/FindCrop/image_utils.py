@@ -2,20 +2,36 @@ import math
 
 import cv2
 import numpy as np
+try:
+    from PIL import Image as _PILImage
+    _HAVE_PILLOW = True
+except ImportError:
+    _HAVE_PILLOW = False
+
+
+def read_image(path: str) -> np.ndarray:
+    img = cv2.imread(path)
+    if img is not None:
+        return img
+    if _HAVE_PILLOW:
+        pil = _PILImage.open(path)
+        arr = np.array(pil.convert('RGB'))
+        return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+    return None
 
 
 def rotate_image(image: np.ndarray, angle):
     image_size = (image.shape[1], image.shape[0])
     image_center = tuple(np.array(image_size) / 2)
     rot_mat = np.vstack([cv2.getRotationMatrix2D(image_center, angle, 1.0), [0, 0, 1]])
-    rot_mat_notranslate = np.matrix(rot_mat[0:2, 0:2])
+    rot_mat_notranslate = rot_mat[0:2, 0:2]
     image_w2 = image_size[0] * 0.5
     image_h2 = image_size[1] * 0.5
     rotated_coords = [
-        (np.array([-image_w2,  image_h2]) * rot_mat_notranslate).A[0],
-        (np.array([ image_w2,  image_h2]) * rot_mat_notranslate).A[0],
-        (np.array([-image_w2, -image_h2]) * rot_mat_notranslate).A[0],
-        (np.array([ image_w2, -image_h2]) * rot_mat_notranslate).A[0],
+        np.array([-image_w2,  image_h2]) @ rot_mat_notranslate,
+        np.array([ image_w2,  image_h2]) @ rot_mat_notranslate,
+        np.array([-image_w2, -image_h2]) @ rot_mat_notranslate,
+        np.array([ image_w2, -image_h2]) @ rot_mat_notranslate,
     ]
     x_coords = [pt[0] for pt in rotated_coords]
     y_coords = [pt[1] for pt in rotated_coords]
@@ -25,12 +41,12 @@ def rotate_image(image: np.ndarray, angle):
     bot_bound   = min(y for y in y_coords if y < 0)
     new_w = int(abs(right_bound - left_bound))
     new_h = int(abs(top_bound - bot_bound))
-    trans_mat = np.matrix([
+    trans_mat = np.array([
         [1, 0, int(new_w * 0.5 - image_w2)],
         [0, 1, int(new_h * 0.5 - image_h2)],
         [0, 0, 1],
-    ])
-    affine_mat = (np.matrix(trans_mat) * np.matrix(rot_mat))[0:2, :]
+    ], dtype=float)
+    affine_mat = (trans_mat @ rot_mat)[0:2, :]
     return cv2.warpAffine(image, affine_mat, (new_w, new_h), flags=cv2.INTER_LINEAR)
 
 
