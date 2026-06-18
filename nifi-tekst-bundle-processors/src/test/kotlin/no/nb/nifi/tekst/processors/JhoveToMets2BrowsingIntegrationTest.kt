@@ -70,9 +70,9 @@ class JhoveToMets2BrowsingIntegrationTest {
         jhoveRunner.enqueue("test")
         jhoveRunner.run()
 
-        assertProcessed(jhoveRunner)
+        jhoveRunner.assertAllFlowFilesTransferred(Jhove.SUCCESS_RELATIONSHIP)
 
-        // Verify JHOVE output files were created
+        // Verify image JHOVE output files were created
         val accessJhoveOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
         val jhoveOutputFiles = accessJhoveOutputDir.listFiles { file ->
             file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
@@ -97,7 +97,7 @@ class JhoveToMets2BrowsingIntegrationTest {
             val doc = parseXmlFile(jhoveFile)
             val status = xpath(doc, "//jhove:repInfo/jhove:status")
             assertNotNull(status, "JHOVE file ${jhoveFile.name} should have status")
-            assertTrue(status!!.contains("Well-Formed"), "JHOVE status should indicate well-formed")
+            assertEquals("Well-Formed and valid", status, "JHOVE status for ${jhoveFile.name} should be Well-Formed and valid")
 
             // Verify MIX data is present (needed by CreateMetsBrowsing)
             val imageWidth = xpath(doc, "//*[local-name()='imageWidth']")
@@ -106,6 +106,22 @@ class JhoveToMets2BrowsingIntegrationTest {
             assertNotNull(imageHeight, "JHOVE file ${jhoveFile.name} should have imageHeight")
             assertTrue(imageWidth!!.toInt() > 0, "imageWidth should be positive")
             assertTrue(imageHeight!!.toInt() > 0, "imageHeight should be positive")
+        }
+
+        // Verify OCR JHOVE output files were created and are valid
+        val ocrJhoveOutputDir = objectFolder.resolve("representations/access/metadata/other/jhove-ocr").toFile()
+        val ocrJhoveFiles = ocrJhoveOutputDir.listFiles { file ->
+            file.name.startsWith("JHOVE_") && file.name.endsWith(".xml")
+        }?.sortedBy { it.name }
+
+        assertNotNull(ocrJhoveFiles, "OCR JHOVE output files should exist")
+        assertEquals(5, ocrJhoveFiles?.size, "Should have JHOVE output for each OCR file")
+
+        for (jhoveFile in ocrJhoveFiles!!) {
+            val doc = parseXmlFile(jhoveFile)
+            val status = xpath(doc, "//jhove:repInfo/jhove:status")
+            assertNotNull(status, "OCR JHOVE file ${jhoveFile.name} should have status")
+            assertEquals("Well-Formed and valid", status, "OCR JHOVE status for ${jhoveFile.name} should be Well-Formed and valid")
         }
 
         // Step 2: Run CreateMetsBrowsing processor using generated JHOVE data with METS2 and MIX2
@@ -247,7 +263,7 @@ class JhoveToMets2BrowsingIntegrationTest {
 
         jhoveRunner.enqueue("test")
         jhoveRunner.run()
-        assertProcessed(jhoveRunner)
+        jhoveRunner.assertAllFlowFilesTransferred(Jhove.SUCCESS_RELATIONSHIP)
 
         // Verify JHOVE files were created, then delete one
         val accessJhoveOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
@@ -299,7 +315,7 @@ class JhoveToMets2BrowsingIntegrationTest {
         jhoveRunner.enqueue("test")
         jhoveRunner.run()
 
-        assertProcessed(jhoveRunner)
+        jhoveRunner.assertAllFlowFilesTransferred(Jhove.SUCCESS_RELATIONSHIP)
 
         // Step 2: Generate METS1 with MIX1
         val mets1OutputFile = File.createTempFile("mets1_comparison", ".xml")
@@ -427,10 +443,4 @@ class JhoveToMets2BrowsingIntegrationTest {
 
     private fun xpathNodeList(doc: Document, expression: String): NodeList = XmlHelper.xpathNodeList(doc, expression)
 
-    private fun assertProcessed(runner: org.apache.nifi.util.TestRunner) {
-        val routedCount = runner.getFlowFilesForRelationship(Jhove.SUCCESS_RELATIONSHIP).size +
-                runner.getFlowFilesForRelationship(Jhove.FAIL_RELATIONSHIP).size +
-                runner.getFlowFilesForRelationship(Jhove.WELLFORMED_RELATIONSHIP).size
-        assertEquals(1, routedCount, "FlowFile should be routed to success, well-formed, or failure")
-    }
 }

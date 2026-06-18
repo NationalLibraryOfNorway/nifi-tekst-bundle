@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jhove xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schema.openpreservation.org/ois/xml/ns/jhove" xsi:schemaLocation="http://schema.openpreservation.org/ois/xml/ns/jhove https://schema.openpreservation.org/ois/xml/xsd/jhove/1.10/jhove.xsd" name="Jhove" release="1.20.1" date="2009-12-23">
- <date>2025-12-08T16:51:39+00:00</date>
- <repInfo uri="file:////home/sindreo/projects/nifi/nifi-tekst-bundle/nifi-tekst-bundle-processors/src/test/resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/access/metadata/other/ocr/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_003.xml">
+ <date>2026-06-18T11:24:43+00:00</date>
+ <repInfo uri="file:////data/test-resources/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72/representations/access/metadata/other/ocr/tekst_ee11f8dd-512a-49c2-95f0-03ece023fe72_003.xml">
   <reportingModule release="1.5.5" date="2024-08-22">XML-hul</reportingModule>
-  <lastModified>2025-12-05T12:55:29+00:00</lastModified>
+  <lastModified>2026-04-15T11:36:53+00:00</lastModified>
   <size>411832</size>
   <format>XML</format>
   <version>1.0</version>
-  <status>Well-Formed and valid</status>
+  <status>Well-Formed, but not valid</status>
   <sigMatch>
   <module>XML-hul</module>
   </sigMatch>
+  <messages>
+   <message subMessage="Line = 305, Column = 47." severity="error" id="XML-HUL-1" infoLink="https://github.com/openpreserve/jhove/wiki/XML-hul-Messages#xml-hul-1">SAXParseException: src-resolve: Cannot resolve the name 'xlink:simpleLink' to a(n) 'attribute group' component.</message>
+   <message subMessage="Line = 3, Column = 171." severity="error" id="XML-HUL-1" infoLink="https://github.com/openpreserve/jhove/wiki/XML-hul-Messages#xml-hul-1">SAXParseException: src-import.3.1: The namespace attribute, 'http://www.w3.org/TR/xlink', of an &lt;import&gt; element information item must be identical to the targetNamespace attribute, 'http://www.w3.org/1999/xlink', of the imported document.</message>
+  </messages>
   <mimeType>text/xml</mimeType>
   <properties>
    <property>
