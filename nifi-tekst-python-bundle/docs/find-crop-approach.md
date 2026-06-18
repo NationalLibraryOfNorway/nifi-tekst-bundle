@@ -12,16 +12,29 @@ The crop may be rotated relative to the uncropped image because the autocrop too
 
 ```
 uncropped image ──┐
-                  ├─► find_crop() ──► FoundCrop (corners, rotation, score)
-cropped image  ───┘                        │
-                                           ▼
-                              transform_corners_to_deskewed()
-                                           │
-                                           ▼
-                              snap_bounds_to_known_size()
-                                           │
-                                           ▼
-                              build_xmp() ──► XMP sidecar
+                  ├─► find_crop()
+cropped image  ───┘       │
+                          ├─(use_hough=True)──► _estimate_skew_hough()
+                          │                          │ confident?
+                          │              yes ◄────── ┤
+                          │               │          │ no
+                          │    seeded ±2° search     │
+                          │               │ score≥0.5?
+                          │    return ◄───┘      │ no
+                          │                      │
+                          └──────────────────────┘
+                          │
+                          ▼  full ±5° cubic grid search
+                     FoundCrop (corners, rotation, score, used_hough)
+                          │
+                          ▼
+               transform_corners_to_deskewed()
+                          │
+                          ▼
+               snap_bounds_to_known_size()
+                          │
+                          ▼
+               build_xmp() ──► XMP sidecar
 ```
 
 ---
@@ -36,7 +49,37 @@ Crucially, reducing `resize_factor` below 0.1 does not change position accuracy 
 
 ---
 
-## Step 2: Coarse Rotation Search
+## Step 2: Hough-Seeded Fast Path
+
+Before the full grid search, the algorithm optionally estimates the document skew using the Hough line transform (`use_hough=True` by default).
+
+### Why Hough
+
+Document pages have strong near-horizontal text baselines. If Hough can reliably detect those lines, their mean angle is a direct estimate of the skew — no rotation search needed. This seeds a narrow ±2° window around the estimate instead of scanning the full ±5° grid, which:
+
+- Reduces the number of `warpAffine + matchTemplate` calls from ~71 to ~21 for the seeded pass
+- Extends the effective rotation range: a confident Hough angle can seed the search even outside the normal ±5° grid
+
+### How it works
+
+1. Convert the uncropped image to greyscale and downsample to **0.2 scale** (fixed, independent of `resize_factor`; Hough needs more detail than template matching does).
+2. Run Canny edge detection (thresholds 50/150).
+3. Run `cv2.HoughLines` with 1 px resolution and **0.1° angular resolution**. The accumulator threshold is `max(10, width × 0.25)` — a line must be supported by at least 25% of the image width.
+4. Keep only lines whose angle is within ±10° of horizontal (i.e., `|θ − 90°| < 10°`).
+5. If fewer than `min_lines=10` survive, or if their standard deviation exceeds `max_std_deg=0.8°`, return `None` — not confident enough.
+6. Otherwise return the **median** angle as the skew estimate.
+
+### Fallback logic
+
+The seeded search runs 21 angles from `[estimate − 2°, estimate + 2°]` with the same two-phase refinement as the full search. If the best score is ≥ `hough_fallback_threshold` (default 0.5), the result is returned immediately with `used_hough=True`.
+
+If Hough returns `None`, or if the seeded score falls below the threshold, the full ±5° cubic grid search runs as normal and `used_hough` is `False`.
+
+The FlowFile attribute `crop.used_hough` (`true`/`false`) records which path was taken.
+
+---
+
+## Step 3: Coarse Rotation Search
 
 The algorithm searches across a range of candidate rotation angles. Since most document skew is small, the angles are distributed non-uniformly using a cubic mapping:
 
@@ -64,7 +107,7 @@ For each candidate angle:
 
 ---
 
-## Step 3: Two-Phase Rotation Refinement
+## Step 4: Two-Phase Rotation Refinement
 
 The coarse grid leaves residual error of up to 0.5° at large angles. Two techniques reduce this:
 
@@ -95,7 +138,7 @@ The improvement is largest at larger angles because that is where the coarse gri
 
 ---
 
-## Step 4: Back-Project Corners into Original Image Space
+## Step 5: Back-Project Corners into Original Image Space
 
 The template match finds the top-left position of the crop in the **rotated** uncropped image. The corresponding four corners of the crop rectangle must be projected back into the **original** (unrotated) uncropped image space.
 
@@ -109,7 +152,7 @@ Corners that land outside the image bounds are discarded.
 
 ---
 
-## Step 5: Scale Back to Full Resolution
+## Step 6: Scale Back to Full Resolution
 
 All corner coordinates are divided by `resize_factor` to recover full-resolution pixel positions:
 
@@ -119,7 +162,7 @@ best_match.corners = (best_match.corners / resize_factor).astype(int)
 
 ---
 
-## Step 6: Transform Corners to Deskewed Bounds
+## Step 7: Transform Corners to Deskewed Bounds
 
 The corners are in the original (skewed) image space. To get axis-aligned crop bounds in the **deskewed** space — which is what the XMP needs — each corner is rotated by `−rotation` around the image centre:
 
@@ -133,7 +176,7 @@ The bounding box of the four transformed corners gives `(top, left, bottom, righ
 
 ---
 
-## Step 7: Snap Bounds to Known Size
+## Step 8: Snap Bounds to Known Size
 
 The `/ resize_factor` step in Step 5 introduces a systematic dimension error:
 
@@ -156,7 +199,7 @@ After snapping, crop dimensions are exact regardless of `resize_factor`.
 
 ---
 
-## Step 8: XMP Output
+## Step 9: XMP Output
 
 The final bounds and rotation angle are written into an XMP sidecar using the Adobe Camera Raw Settings (`crs:`) namespace:
 
@@ -197,6 +240,8 @@ If either error exceeds the configured tolerance (default 200 px), the FlowFile 
 |-----------|---------|--------|
 | `resize_factor` | 0.1 | Downsample ratio before matching. Lower = faster, same accuracy for large crops. |
 | `check_inverted` | true | Also try colour-inverted template; keeps the better score. |
+| `use_hough` | true | Enable Hough-seeded fast path. Disable to always run the full grid (useful for benchmarking or images with no clear text lines). |
+| `hough_fallback_threshold` | 0.5 | Minimum match score required to accept the Hough-seeded result. If the score falls below this, the full grid runs instead. |
 | `refine_rotation` | true | Enable two-phase refinement. Disable only for benchmarking. |
 | `refine_steps` | 20 | Number of fine-grid angles per refinement pass. |
 | `Dimension Tolerance` | 200 px | Allowed ALTO vs found-crop size discrepancy. |
@@ -205,7 +250,7 @@ If either error exceeds the configured tolerance (default 200 px), the FlowFile 
 
 ## Known Limitations
 
-- **Rotation range**: ±5°. Documents skewed more than 5° will produce a poor match score. The `rotations` parameter can be overridden to extend the range.
+- **Rotation range**: ±5° for the full grid. When Hough succeeds, the seeded ±2° window is centred on the Hough estimate, so the effective range extends as far as Hough can reliably detect lines. Documents with no clear text lines and skew > 5° will produce a poor match score; the `rotations` parameter can be overridden to extend the grid range manually.
 - **Template must fit inside uncropped**: the algorithm assumes the crop is a sub-region of the uncropped image. Padding or canvas extension in the original is not handled.
 - **Pixel-perfect reconstruction not guaranteed**: applying the XMP crop to the uncropped image will give the same visual content but not identical pixel values, because bilinear rotation interpolation is not invertible and JP2 encoding introduces its own lossy rounding.
 - **Fixed 400 DPI scale**: the ALTO validation assumes NB's access scan standard. Collections scanned at different DPI would need `NB_ACCESS_SCALE` adjusted in `alto_utils.py`.
