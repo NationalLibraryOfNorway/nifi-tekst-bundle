@@ -153,14 +153,26 @@ class FindCrop(FlowFileTransform):
             xmp = build_xmp(result.rotation, top, left, bottom, right)
 
             tolerance = int(float(context.getProperty(self.DIMENSION_TOLERANCE.name).getValue()))
+            version = self.ProcessorDetails.version
+            provenance = (
+                f'no.nb.nifi/FindCrop/{version}; '
+                f'resize_factor={resize_factor}; '
+                f'check_inverted={str(check_inverted).lower()}; '
+                f'use_hough={str(use_hough).lower()}; '
+                f'used_hough={str(result.used_hough).lower()}; '
+                f'rotation={round(float(result.rotation), 6)}; '
+                f'score={round(float(result.score), 6)}; '
+                f'elapsed_ms={elapsed_ms}'
+            )
             attributes = {
-                'crop.score':              str(round(float(result.score),    6)),
-                'crop.rotation':           str(round(float(result.rotation), 6)),
-                'crop.used_hough':         str(result.used_hough).lower(),
-                'crop.resize_factor':      str(resize_factor),
-                'crop.check_inverted':     str(check_inverted).lower(),
+                'crop.score':               str(round(float(result.score),    6)),
+                'crop.rotation':            str(round(float(result.rotation), 6)),
+                'crop.used_hough':          str(result.used_hough).lower(),
+                'crop.resize_factor':       str(resize_factor),
+                'crop.check_inverted':      str(check_inverted).lower(),
                 'crop.dimension_tolerance': str(tolerance),
-                'crop.elapsed_ms':         str(elapsed_ms),
+                'crop.elapsed_ms':          str(elapsed_ms),
+                'crop.provenance':          provenance,
             }
 
             alto_path = (
