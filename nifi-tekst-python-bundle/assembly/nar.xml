@@ -1,0 +1,32 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <id>nar</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <fileSets>
+        <fileSet>
+            <directory>src/main/python/META-INF</directory>
+            <outputDirectory>/META-INF</outputDirectory>
+            <filtered>true</filtered>
+        </fileSet>
+        <fileSet>
+            <directory>src/main/python/FindCrop</directory>
+            <outputDirectory>/FindCrop</outputDirectory>
+            <excludes>
+                <exclude>**/__pycache__/**</exclude>
+                <exclude>**/*.pyc</exclude>
+            </excludes>
+        </fileSet>
+        <fileSet>
+            <directory>target/bundled-deps</directory>
+            <outputDirectory>/NAR-INF/bundled-dependencies</outputDirectory>
+            <excludes>
+                <exclude>**/__pycache__/**</exclude>
+                <exclude>**/*.pyc</exclude>
+            </excludes>
+        </fileSet>
+    </fileSets>
+</assembly>

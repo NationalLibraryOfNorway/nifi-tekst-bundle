@@ -7,7 +7,8 @@ Bundle av prosessorer laget for produksjonsløyper for tekstmateriale.
 ### Forutsetninger
 
 * Docker og Docker Compose
-* JDK 21 og Maven (for å bygge NAR-pakken)
+* JDK 21 og Maven (for å bygge NAR-pakkene)
+* [uv](https://docs.astral.sh/uv/getting-started/installation/) (for å bygge Python-bundle og kjøre Python-tester)
 * [Git LFS](https://git-lfs.com/) (for å laste ned testfiler med store størrelser).
   * [Installeringsinstruksjoner](https://github.com/git-lfs/git-lfs?tab=readme-ov-file#installing)
   * OBS: Installering av Git LFS må gjøres før kloning av repoet, ellers vil ikke testfiler lastes ned. Hvis du allerede har klonet repoet, kjør `git lfs install` og deretter `git lfs pull` i repo-mappen.
@@ -49,11 +50,14 @@ Denne flowen skal vi bruke for lokal utvikling, og du kan bruke volume mountene 
 
 ### Volume mounts
 
-| Mount                                               | Container-sti                           | Beskrivelse                                       |
-|-----------------------------------------------------|-----------------------------------------|---------------------------------------------------|
-| `./nifi-tekst-bundle-nar/target`                    | `/opt/nifi/nifi-current/nar_extensions` | NAR-pakken med custom prosessorer (read-only)     |
-| `./nifi-tekst-bundle-processors/src/test/resources` | `/data/test-resources`                  | Testfiler for utvikling og testing (read-only)    |
-| `./nifi-docker/output`                              | `/data/output`                          | Mappe for output fra NiFi-flows                   |
+| Mount                                               | Container-sti                           | Beskrivelse                                                                 |
+|-----------------------------------------------------|-----------------------------------------|-----------------------------------------------------------------------------|
+| `./nifi-docker-extensions`                          | `/opt/nifi/nifi-current/nar_extensions` | Alle NAR-pakker (Java og Python) — populeres automatisk av `mvn package`    |
+| `./nifi-tekst-bundle-processors/src/test/resources` | `/data/test-resources`                  | Testfiler for Java-prosessorer (read-only)                                  |
+| `./nifi-tekst-python-bundle/src/test/resources`     | `/data/python-test-resources`           | Testfiler for Python-prosessorer (read-only)                                |
+| `./nifi-docker/output`                              | `/data/output`                          | Mappe for output fra NiFi-flows                                             |
+
+`nifi-docker-extensions/` opprettes og oppdateres automatisk under bygg og er utelatt fra Git.
 
 Testfiler fra `nifi-tekst-bundle-processors/src/test/resources` er tilgjengelig i containeren under `/data/test-resources` og kan brukes direkte som input når du tester prosessorer manuelt i NiFi.
 
@@ -65,12 +69,22 @@ git clean -fdx nifi-tekst-bundle-processors/src/test/resources/
 
 ### Rebuild etter endringer
 
-Etter endringer i prosessor-koden:
+Etter endringer i **Java-prosessorer**:
 
 ```bash
 mvn clean package -DskipTests
 docker compose restart nifi
 ```
+
+Etter endringer i **Python-prosessorer**:
+
+```bash
+mvn package -pl nifi-tekst-python-bundle -DskipPythonTests
+docker exec nifi rm -rf /opt/nifi/nifi-current/work/nar/extensions/nifi-tekst-python-bundle-2.0.0.nar-unpacked
+docker compose restart nifi
+```
+
+NiFi cacher utpakkede NAR-filer, så den gamle cachen må slettes for at endringer i Python-filer skal plukkes opp.
 
 ## Utrulling
 

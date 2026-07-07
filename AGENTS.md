@@ -15,17 +15,18 @@ A bundle of custom Apache NiFi processors used in production pipelines for text 
 This repository contains:
 
 - `nifi-tekst-bundle-processors` - The custom NiFi processors and supporting code (Kotlin)
-- `nifi-tekst-bundle-nar` - Packages the processors into a deployable NiFi NAR archive
+- `nifi-tekst-bundle-nar` - Packages the Kotlin processors into a deployable NiFi NAR archive
+- `nifi-tekst-python-bundle` - Python-based NiFi processors packaged as a NAR archive
 - `nifi-docker` - Local Docker setup for running NiFi with the bundle (see `docker-compose.yml`)
 
 Primary technologies:
 
-- Language: Kotlin (with JVM interop); some resources in XML/XSD
+- Languages: Kotlin (with JVM interop); Python 3.11; some resources in XML/XSD
 - Framework: Apache NiFi 2.3.0 extension bundle
-- Package manager: Maven (dependencies resolved from Maven Central and the internal NB Artifactory)
-- Runtime: JDK 21 (Temurin, per `.sdkmanrc`)
-- Test framework: JUnit 5 (Jupiter) with `nifi-mock` and Testcontainers (Minio)
-- Build system: Maven 3.9 (multi-module reactor; NAR built via `nifi-nar-maven-plugin`)
+- Package managers: Maven (JVM dependencies from Maven Central and NB Artifactory); uv (Python dependencies)
+- Runtime: JDK 21 (Temurin, per `.sdkmanrc`); Python 3.11 (inside the NiFi Docker container)
+- Test frameworks: JUnit 5 (Jupiter) with `nifi-mock` and Testcontainers (Minio); pytest for Python
+- Build system: Maven 3.9 (multi-module reactor; Java NAR via `nifi-nar-maven-plugin`; Python NAR via `maven-assembly-plugin`)
 
 ---
 
@@ -196,7 +197,7 @@ Run tests for a single module:
 mvn -pl nifi-tekst-bundle-processors test
 ```
 
-Run all checks and build the deployable NAR before opening a PR (this is what CI verifies):
+Run all checks and build the deployable NARs before opening a PR (this is what CI verifies):
 
 ```bash
 mvn clean package
@@ -206,6 +207,24 @@ Build without tests (e.g. for local Docker iteration):
 
 ```bash
 mvn clean package -DskipTests
+```
+
+Run only the Python tests:
+
+```bash
+mvn test -pl nifi-tekst-python-bundle
+```
+
+Skip only the Python tests (useful when `uv` is unavailable):
+
+```bash
+mvn clean package -DskipPythonTests
+```
+
+Rebuild only the Python bundle (faster iteration on Python processors):
+
+```bash
+mvn package -pl nifi-tekst-python-bundle -DskipPythonTests
 ```
 
 For local end-to-end verification in NiFi, see `README.md` (Docker Compose setup at https://localhost:8443/nifi/).
@@ -218,10 +237,11 @@ When behavior changes, add or update tests.
 
 Preferred test locations:
 
-- Unit tests: `nifi-tekst-bundle-processors/src/test/kotlin` (mirror the package of the code under test)
-- Processor tests: use `nifi-mock` (`TestRunners`) to exercise processors in isolation
-- Integration tests: same source tree, using Testcontainers (Minio) — these require a running Docker daemon
-- Test fixtures/sample files: `nifi-tekst-bundle-processors/src/test/resources` (tracked with Git LFS)
+- Kotlin unit tests: `nifi-tekst-bundle-processors/src/test/kotlin` (mirror the package of the code under test)
+- Kotlin processor tests: use `nifi-mock` (`TestRunners`) to exercise processors in isolation
+- Kotlin integration tests: same source tree, using Testcontainers (Minio) — these require a running Docker daemon
+- Kotlin test fixtures/sample files: `nifi-tekst-bundle-processors/src/test/resources` (tracked with Git LFS)
+- Python tests: `nifi-tekst-python-bundle/src/test/python/` — run via `uv run pytest` or `mvn test -pl nifi-tekst-python-bundle`
 - End-to-end verification: manual, via the local Docker/NiFi setup described in `README.md`
 
 Testing rules:
@@ -302,6 +322,8 @@ If a dependency is necessary, explain:
 
 ## Processor Guidelines
 
+### Kotlin processors (`nifi-tekst-bundle-processors`)
+
 Follow existing patterns for NiFi processors in `nifi-tekst-bundle-processors`.
 
 Rules:
@@ -313,6 +335,18 @@ Rules:
 - Validate inputs at the processor boundary; handle errors consistently with nearby processors.
 - When touching XML/METS/MIX handling, keep the bundled XSDs and offline entity resolution working (avoid introducing external HTTP schema lookups).
 - Add tests (`nifi-mock` and, where relevant, Testcontainers) for new behavior and edge cases.
+
+### Python processors (`nifi-tekst-python-bundle`)
+
+Follow existing patterns in `nifi-tekst-python-bundle/src/main/python/`.
+
+Rules:
+
+- Declare `PropertyDescriptor` objects as **class-level attributes** (not in `__init__`); NiFi discovers them before instantiation.
+- Keep `__init__(self, **kwargs)` calling `super().__init__()` (without `**kwargs`) to absorb the `jvm` argument the NiFi framework injects.
+- Use `try/except ImportError` for intra-package imports so they work both as a package (tests) and as flat modules (NiFi runtime).
+- Do not add third-party runtime dependencies to `ProcessorDetails.dependencies` — all runtime deps are bundled in the NAR via `NAR-INF/bundled-dependencies/`. To add a new runtime dep, list it explicitly in the `install-python-bundled-deps` exec step in `nifi-tekst-python-bundle/pom.xml` and in the `dependencies` section of `pyproject.toml`. `pyproject.toml` is the single source of truth for both runtime and test deps.
+- Add pytest tests in `src/test/python/` for new behavior.
 
 ---
 
@@ -350,6 +384,7 @@ Relevant docs:
 
 - `README.md` (Norwegian) - local Docker development, build/deploy, and maintenance notes
 - `docker-compose.yml` - local NiFi setup and volume mounts
+- `nifi-tekst-python-bundle/docs/find-crop-approach.md` - algorithm design for the FindCrop processor
 - This file (`AGENTS.md`) - keep updated when commands, modules, or conventions change
 
 ---
