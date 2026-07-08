@@ -58,20 +58,29 @@ object RenameS3Utils {
                 val targetId = extractIdFromFilename(instruction.newName)
                     ?: throw IllegalArgumentException("Could not extract targetId from '${instruction.newName}'")
 
+                var foundInAnyRepresentation = false
+
                 for (representation in KEY_REPRESENTATIONS) {
                     val sourceKey = buildKey(prefix, sourceId, representation, instruction.originalName)
                     val finalKey = buildKey(prefix, targetId, representation, instruction.newName)
                     val tempKey = "tmp_${UUIDv7.randomUUID()}_${instruction.originalName}"
 
                     if (!keyExists(client, bucket, sourceKey)) {
-                        throw IllegalStateException(
-                            "Source key not found in bucket '$bucket': '$sourceKey'. " +
-                                    "S3 structure may be out of sync with disk. Aborting rename."
-                        )
+                        logger.debug("Source key not found in representation '$representation', skipping: '$sourceKey'")
+                        continue
                     }
 
+                    foundInAnyRepresentation = true
                     copyObjectWithinBucket(client, bucket, sourceKey, tempKey)
                     staged.add(StagedS3File(sourceKey, tempKey, finalKey))
+                }
+
+                if (!foundInAnyRepresentation) {
+                    throw IllegalStateException(
+                        "Source file '${instruction.originalName}' not found in any representation (access or primary) " +
+                                "for itemId '$sourceId' in bucket '$bucket'. " +
+                                "S3 structure may be out of sync with disk. Aborting rename."
+                    )
                 }
             }
         } catch (e: Exception) {

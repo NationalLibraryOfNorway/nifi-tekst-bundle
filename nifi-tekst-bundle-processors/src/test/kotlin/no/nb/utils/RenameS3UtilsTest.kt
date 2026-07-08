@@ -225,6 +225,44 @@ class RenameS3UtilsTest : S3TestBase() {
             assertTrue(keyExists(key), "Key should remain untouched when instructions are empty")
             assertEquals(1, listAllKeys().size, "Bucket should be unchanged")
         }
+
+        @Test
+        fun `should rename file that exists only in primary representation without access`() {
+            val originalName = "${standardFilename}_00001.tif"
+            val newName = "${standardFilename}_00002.tif"
+
+            // Create file only in primary representation (not in access)
+            makePrimaryObject(originalName)
+            assertFalse(keyExists(accessKey(originalName)), "Original access key should not exist")
+            assertTrue(keyExists(primaryKey(originalName)), "Original primary key should exist")
+
+            // Perform rename
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, listOf(RenameInstruction(originalName, newName)), testPrefix)
+
+            // Verify file exists at new name only in primary
+            assertFalse(keyExists(accessKey(newName)), "New access key should not exist")
+            assertTrue(keyExists(primaryKey(newName)), "New primary key should exist")
+            assertFalse(keyExists(primaryKey(originalName)), "Original primary key should be deleted")
+        }
+
+        @Test
+        fun `should rename file that exists only in access representation without primary`() {
+            val originalName = "${standardFilename}_00001.tif"
+            val newName = "${standardFilename}_00002.tif"
+
+            // Create file only in access representation (not in primary)
+            makeAccessObject(originalName)
+            assertTrue(keyExists(accessKey(originalName)), "Original access key should exist")
+            assertFalse(keyExists(primaryKey(originalName)), "Original primary key should not exist")
+
+            // Perform rename
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, listOf(RenameInstruction(originalName, newName)), testPrefix)
+
+            // Verify file exists at new name only in access
+            assertTrue(keyExists(accessKey(newName)), "New access key should exist")
+            assertFalse(keyExists(primaryKey(newName)), "New primary key should not exist")
+            assertFalse(keyExists(accessKey(originalName)), "Original access key should be deleted")
+        }
     }
 
     //Rollback

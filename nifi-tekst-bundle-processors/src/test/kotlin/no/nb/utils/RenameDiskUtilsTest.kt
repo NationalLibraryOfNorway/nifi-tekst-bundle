@@ -122,6 +122,11 @@ class RenameDiskUtilsTest {
 
     @Test
     fun `renameFilesOnDisk cleans up temporary directory on success`() {
+        renameInstructions.forEach { instruction ->
+            TestFileUtils.createFile(baseDir, "access", instruction.originalName, "access-content")
+            TestFileUtils.createFile(baseDir, "primary", instruction.originalName, "primary-content")
+        }
+
         renameFilesOnDisk(baseDir, renameInstructions)
 
         // Assert no temp_conflicts_ directory remains
@@ -190,5 +195,73 @@ class RenameDiskUtilsTest {
                 )
             )
         }
+    }
+
+    @Test
+    fun `renameFilesOnDisk renames when file exists only in primary`() {
+        val folderName = "tekst_test_only_primary"
+        val originalName = "${folderName}_00001.jp2"
+        val newName = "${folderName}_00002.jp2"
+
+        val primaryFile = TestFileUtils.createFile(baseDir, "primary", originalName, "primary-content")
+        val accessFile = baseDir.resolve("$folderName/representations/access/data/$originalName").toFile()
+
+        assertTrue(primaryFile.exists(), "Primary file should exist before rename")
+        assertFalse(accessFile.exists(), "Access file should not exist before rename")
+
+        renameFilesOnDisk(baseDir, listOf(RenameInstruction(originalName, newName)))
+
+        assertFalse(primaryFile.exists(), "Original primary file should be moved")
+        assertTrue(
+            baseDir.resolve("$folderName/representations/primary/data/$newName").toFile().exists(),
+            "Renamed primary file should exist"
+        )
+        assertFalse(
+            baseDir.resolve("$folderName/representations/access/data/$newName").toFile().exists(),
+            "Access file should still be absent"
+        )
+    }
+
+    @Test
+    fun `renameFilesOnDisk renames when file exists only in access`() {
+        val folderName = "tekst_test_only_access"
+        val originalName = "${folderName}_00001.jp2"
+        val newName = "${folderName}_00002.jp2"
+
+        val accessFile = TestFileUtils.createFile(baseDir, "access", originalName, "access-content")
+        val primaryFile = baseDir.resolve("$folderName/representations/primary/data/$originalName").toFile()
+
+        assertTrue(accessFile.exists(), "Access file should exist before rename")
+        assertFalse(primaryFile.exists(), "Primary file should not exist before rename")
+
+        renameFilesOnDisk(baseDir, listOf(RenameInstruction(originalName, newName)))
+
+        assertFalse(accessFile.exists(), "Original access file should be moved")
+        assertTrue(
+            baseDir.resolve("$folderName/representations/access/data/$newName").toFile().exists(),
+            "Renamed access file should exist"
+        )
+        assertFalse(
+            baseDir.resolve("$folderName/representations/primary/data/$newName").toFile().exists(),
+            "Primary file should still be absent"
+        )
+    }
+
+    @Test
+    fun `renameFilesOnDisk throws when source file is missing in both representations`() {
+        val folderName = "tekst_test_missing_everywhere"
+        val instruction = RenameInstruction(
+            originalName = "${folderName}_00001.jp2",
+            newName = "${folderName}_00002.jp2"
+        )
+
+        val exception = assertThrows(IllegalStateException::class.java) {
+            renameFilesOnDisk(baseDir, listOf(instruction))
+        }
+
+        assertTrue(
+            exception.message?.contains("not found in any representation") == true,
+            "Error should explain that neither access nor primary contained the source file"
+        )
     }
 }
