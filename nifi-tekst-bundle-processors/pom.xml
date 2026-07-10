@@ -19,6 +19,7 @@
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <kotlin.version>2.1.0</kotlin.version>
+        <nvd.repo.url>${env.NVD_REPO}</nvd.repo.url>
     </properties>
 
     <parent>
@@ -100,6 +101,22 @@
                 <configuration>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>12.2.2</version>
+                <configuration>
+                    <nvdDatafeedUrl>https://${nvd.repo.url}/nvdcve-{0}.json.gz</nvdDatafeedUrl>
+                    <failBuildOnCVSS>11</failBuildOnCVSS>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
