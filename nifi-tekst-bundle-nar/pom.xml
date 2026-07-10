@@ -21,11 +21,11 @@
     <parent>
         <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
-        <version>2.0.0</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>nifi-tekst-bundle-nar</artifactId>
-    <version>2.0.0</version>
+    <version>${revision}</version>
     <packaging>nar</packaging>
     <properties>
         <maven.javadoc.skip>true</maven.javadoc.skip>

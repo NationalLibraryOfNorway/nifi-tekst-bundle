@@ -24,7 +24,7 @@
     <parent>
         <groupId>no.nb.nifi</groupId>
         <artifactId>nifi-tekst-bundle</artifactId>
-        <version>2.0.0</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>nifi-tekst-bundle-processors</artifactId>

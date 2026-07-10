@@ -34,6 +34,7 @@ class JhoveTest {
         TestObjectFolderHelper.deleteTempObjectFolder(objectFolder)
     }
 
+    // Covers the fallback path: no dynamic properties configured → FOLDER_MAPPINGS defaults are used
     @Test
     fun testValidProcessingCreatesJhoveOutputs() {
         val runner = TestRunners.newTestRunner(Jhove::class.java)
@@ -47,21 +48,14 @@ class JhoveTest {
 
         val primaryOutputDir = objectFolder.resolve("representations/primary/metadata/technical/jhove").toFile()
         val accessOutputDir = objectFolder.resolve("representations/access/metadata/technical/jhove").toFile()
-        val ocrOutputDir = objectFolder.resolve("representations/access/metadata/other/jhove-ocr").toFile()
         val descriptiveOutputDir = objectFolder.resolve("metadata/other/jhove").toFile()
 
         assertTrue(primaryOutputDir.exists(), "Primary JHOVE output dir should exist")
         assertTrue(accessOutputDir.exists(), "Access JHOVE output dir should exist")
-        assertTrue(ocrOutputDir.exists(), "OCR JHOVE output dir should exist")
         assertTrue(descriptiveOutputDir.exists(), "Descriptive JHOVE output dir should exist")
 
         assertEquals(4, primaryOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
         assertEquals(4, accessOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
-        assertEquals(4, ocrOutputDir.listFiles { file ->
-                file.name.endsWith(".xml")
-                        && !file.name.endsWith("mets.xml.xml", ignoreCase = true)
-            }?.size
-        )
         assertEquals(1, descriptiveOutputDir.listFiles { file -> file.name.endsWith(".xml") }?.size)
     }
 
@@ -77,7 +71,7 @@ class JhoveTest {
             )
             copyDir(
                 fixtureRoot.resolve("representations/access/metadata/other/ocr"),
-                noAccessFolder.resolve("representations/primary/metadata/other/ocr")
+                noAccessFolder.resolve("representations/primary/metadata/other/ocr-for-transformed")
             )
 
             val runner = TestRunners.newTestRunner(Jhove::class.java)
@@ -89,25 +83,50 @@ class JhoveTest {
             assertProcessed(runner)
 
             val primaryOcrJhoveDir =
-                noAccessFolder.resolve("representations/primary/metadata/other/jhove-ocr").toFile()
-            assertTrue(primaryOcrJhoveDir.exists(), "Primary OCR JHOVE output dir should exist")
+                noAccessFolder.resolve("representations/primary/metadata/other/jhove-ocr-for-transformed").toFile()
+            assertTrue(primaryOcrJhoveDir.exists(), "Primary OCR-for-transformed JHOVE output dir should exist")
             assertEquals(
                 4,
                 primaryOcrJhoveDir.listFiles { file ->
                     file.name.endsWith(".xml")
                             && !file.name.endsWith("mets.xml.xml", ignoreCase = true)
                 }?.size,
-                "Primary OCR JHOVE output should be generated for every OCR file"
+                "Primary OCR-for-transformed JHOVE output should be generated for every OCR file"
             )
 
             // No access representation present, so no access JHOVE output should be produced.
             assertFalse(
-                noAccessFolder.resolve("representations/access/metadata/other/jhove-ocr").toFile().exists(),
+                noAccessFolder.resolve("representations/access/metadata/other/jhove-ocr-for-transformed").toFile().exists(),
                 "Access OCR JHOVE output dir should not be created when no access representation exists"
             )
         } finally {
             noAccessFolder.toFile().deleteRecursively()
         }
+    }
+
+    @Test
+    fun testDynamicMappingsReplaceDefaults() {
+        val runner = TestRunners.newTestRunner(Jhove::class.java)
+        runner.setProperty(Jhove.OBJECT_FOLDER, objectFolder.toString())
+
+        // Dynamic property: name = source subfolder, value = custom target subfolder
+        runner.setProperty("representations/primary/data", "custom/jhove/test-output")
+
+        runner.enqueue("test")
+        runner.run()
+
+        assertProcessed(runner)
+
+        // Custom target must have JHOVE output
+        val customOutputDir = objectFolder.resolve("custom/jhove/test-output").toFile()
+        assertTrue(customOutputDir.exists(), "Custom dynamic target dir should exist")
+        val xmlFiles = customOutputDir.listFiles { f -> f.name.endsWith(".xml") }
+        assertNotNull(xmlFiles, "Custom target dir should contain files")
+        assertTrue(xmlFiles!!.isNotEmpty(), "Custom target dir should contain at least one JHOVE XML file")
+
+        // Default-only folder must NOT be created (replace, not merge)
+        val defaultDescriptiveDir = objectFolder.resolve("metadata/other/jhove").toFile()
+        assertFalse(defaultDescriptiveDir.exists(), "Default mapping folder should not be created when dynamic props are set")
     }
 
     private fun copyDir(source: Path, target: Path) {
