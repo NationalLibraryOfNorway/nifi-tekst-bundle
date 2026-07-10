@@ -305,7 +305,7 @@ class ReorderFiles(
             val secretKey = context.getProperty(SECRET_KEY).value
             val region = context.getProperty(REGION).evaluateAttributeExpressions(flowFile).value
             val endpoint = context.getProperty(ENDPOINT).evaluateAttributeExpressions(flowFile).value
-            val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value.trimEnd('/')
+            val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value?.trimEnd('/') ?: ""
             val client = getS3Client(accessKey, secretKey, region, endpoint)
             val zeroPadding =
                 context.getProperty(RENAME_ZERO_PAD_STRING).evaluateAttributeExpressions(flowFile).value ?: "%05d"
