@@ -385,6 +385,22 @@ class ReorderFilesTest : S3TestBase() {
         )
 
         // S3: renamed files should exist under item B's prefix
+        listOf(1, 2).forEach { page ->
+            val pageStr = "%05d".format(page)
+            assertTrue(
+                keyExists("$testPrefix/$folderB/representations/access/data/${folderB}_$pageStr.tif"),
+                "Renamed access key should exist in S3 for B page $page"
+            )
+            assertTrue(
+                keyExists("$testPrefix/$folderB/representations/primary/data/${folderB}_$pageStr.tif"),
+                "Renamed primary key should exist in S3 for B page $page"
+            )
+        }
+        assertTrue(
+            listAllKeys().none { it.startsWith("tmp_") },
+            "No temp keys should remain after successful run"
+        )
+    }
 
     @Test
     fun `when moving subset of files from item A to item B, source OCR files are deleted even if source folder remains`() {
@@ -449,22 +465,6 @@ class ReorderFilesTest : S3TestBase() {
         assertTrue(
             baseDir.resolve("$folderB/representations/primary/data/${folderB}_00001.tif").toFile().exists(),
             "Renamed primary file should exist under target item"
-        )
-    }
-        listOf(1, 2).forEach { page ->
-            val pageStr = "%05d".format(page)
-            assertTrue(
-                keyExists("$testPrefix/$folderB/representations/access/data/${folderB}_$pageStr.tif"),
-                "Renamed access key should exist in S3 for B page $page"
-            )
-            assertTrue(
-                keyExists("$testPrefix/$folderB/representations/primary/data/${folderB}_$pageStr.tif"),
-                "Renamed primary key should exist in S3 for B page $page"
-            )
-        }
-        assertTrue(
-            listAllKeys().none { it.startsWith("tmp_") },
-            "No temp keys should remain after successful run"
         )
     }
 
@@ -544,19 +544,19 @@ class ReorderFilesTest : S3TestBase() {
         val itemId = UUIDv7.randomUUID().toString()
         val folderName = "tekst_$itemId"
 
-        // Create mix of .tif and .jp2 files in both representations
-        val tifAccess = TestFileUtils.createFile(baseDir, "access", "${folderName}_00001.tif")
-        val jp2Access = TestFileUtils.createFile(baseDir, "access", "${folderName}_00002.jp2")
-        val tifPrimary = TestFileUtils.createFile(baseDir, "primary", "${folderName}_00001.tif")
-        val jp2Primary = TestFileUtils.createFile(baseDir, "primary", "${folderName}_00002.jp2")
+        // Create mix of .tif and .jp2 files in both representations on disk
+        TestFileUtils.createFile(baseDir, "access", "${folderName}_00001.tif")
+        TestFileUtils.createFile(baseDir, "access", "${folderName}_00002.jp2")
+        TestFileUtils.createFile(baseDir, "primary", "${folderName}_00001.tif")
+        TestFileUtils.createFile(baseDir, "primary", "${folderName}_00002.jp2")
 
-        // Create S3 equivalents
+        // S3 always stores .tif keys regardless of the on-disk format
         putObject("$testPrefix/$folderName/representations/access/data/${folderName}_00001.tif")
-        putObject("$testPrefix/$folderName/representations/access/data/${folderName}_00002.jp2")
+        putObject("$testPrefix/$folderName/representations/access/data/${folderName}_00002.tif")
         putObject("$testPrefix/$folderName/representations/primary/data/${folderName}_00001.tif")
-        putObject("$testPrefix/$folderName/representations/primary/data/${folderName}_00002.jp2")
+        putObject("$testPrefix/$folderName/representations/primary/data/${folderName}_00002.tif")
 
-        // Reorder: swap positions and rename - include extensions in orderedImageIds
+        // Reorder: swap positions (jp2 moves to position 1, tif moves to position 2)
         val inputJson = """
             {
               "batchId": "test-mixed-ext",
@@ -576,21 +576,24 @@ class ReorderFilesTest : S3TestBase() {
         runner.run()
         runner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
 
-        // Verify disk: files renamed and extensions preserved
-        val newJp2Access = baseDir.resolve("$folderName/representations/access/data/${folderName}_00001.jp2").toFile()
-        val newTifAccess = baseDir.resolve("$folderName/representations/access/data/${folderName}_00002.tif").toFile()
-        val newJp2Primary = baseDir.resolve("$folderName/representations/primary/data/${folderName}_00001.jp2").toFile()
-        val newTifPrimary = baseDir.resolve("$folderName/representations/primary/data/${folderName}_00002.tif").toFile()
+        // Disk: extensions must be preserved in new positions
+        assertTrue(baseDir.resolve("$folderName/representations/access/data/${folderName}_00001.jp2").toFile().exists(),
+            "Renamed access .jp2 should exist at position 1")
+        assertTrue(baseDir.resolve("$folderName/representations/access/data/${folderName}_00002.tif").toFile().exists(),
+            "Renamed access .tif should exist at position 2")
+        assertTrue(baseDir.resolve("$folderName/representations/primary/data/${folderName}_00001.jp2").toFile().exists(),
+            "Renamed primary .jp2 should exist at position 1")
+        assertTrue(baseDir.resolve("$folderName/representations/primary/data/${folderName}_00002.tif").toFile().exists(),
+            "Renamed primary .tif should exist at position 2")
 
-        assertTrue(newJp2Access.exists(), "Renamed access .jp2 should exist")
-        assertTrue(newTifAccess.exists(), "Renamed access .tif should exist")
-        assertTrue(newJp2Primary.exists(), "Renamed primary .jp2 should exist")
-        assertTrue(newTifPrimary.exists(), "Renamed primary .tif should exist")
-
-        // Verify S3: keys renamed with extensions preserved
-        assertTrue(keyExists("$testPrefix/$folderName/representations/access/data/${folderName}_00001.jp2"))
-        assertTrue(keyExists("$testPrefix/$folderName/representations/access/data/${folderName}_00002.tif"))
-        assertTrue(keyExists("$testPrefix/$folderName/representations/primary/data/${folderName}_00001.jp2"))
-        assertTrue(keyExists("$testPrefix/$folderName/representations/primary/data/${folderName}_00002.tif"))
+        // S3: keys are always .tif, moved to new positions
+        assertTrue(keyExists("$testPrefix/$folderName/representations/access/data/${folderName}_00001.tif"),
+            "S3 access key at new position 1 should be .tif")
+        assertTrue(keyExists("$testPrefix/$folderName/representations/access/data/${folderName}_00002.tif"),
+            "S3 access key at new position 2 should be .tif")
+        assertTrue(keyExists("$testPrefix/$folderName/representations/primary/data/${folderName}_00001.tif"),
+            "S3 primary key at new position 1 should be .tif")
+        assertTrue(keyExists("$testPrefix/$folderName/representations/primary/data/${folderName}_00002.tif"),
+            "S3 primary key at new position 2 should be .tif")
     }
 }
