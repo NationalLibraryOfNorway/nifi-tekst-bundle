@@ -469,14 +469,89 @@ class ReorderFilesTest : S3TestBase() {
     }
 
     @Test
+    fun `cross-item move with empty prefix deletes source S3 keys and creates destination keys without leading slash`() {
+        val itemA = "019a3aa3-d0af-7658-9a44-eeeeeeeeeeee"
+        val itemB = "019a3aa3-d0af-7658-9a44-ffffffffffff"
+        val folderA = "tekst_$itemA"
+        val folderB = "tekst_$itemB"
+
+        val emptyPrefixRunner = setupTestRunner(ReorderFiles()).apply {
+            setProperty(ReorderFiles.PREFIX, "")
+            assertValid()
+        }
+
+        val inputJson = """
+            {
+              "batchId": "test-empty-prefix",
+              "changes": [
+                {
+                  "itemId": "$itemB",
+                  "orderedImageIds": [
+                    "${folderA}_00001",
+                    "${folderA}_00002"
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        // Seed disk: item A has 2 .tif files in access + primary
+        TestFileUtils.createFile(baseDir, "access", "${folderA}_00001.tif")
+        TestFileUtils.createFile(baseDir, "access", "${folderA}_00002.tif")
+        TestFileUtils.createFile(baseDir, "primary", "${folderA}_00001.tif")
+        TestFileUtils.createFile(baseDir, "primary", "${folderA}_00002.tif")
+
+        // Seed S3 WITHOUT any prefix (top-level keys)
+        val sourceKeys = listOf(
+            "$folderA/representations/access/data/${folderA}_00001.tif",
+            "$folderA/representations/access/data/${folderA}_00002.tif",
+            "$folderA/representations/primary/data/${folderA}_00001.tif",
+            "$folderA/representations/primary/data/${folderA}_00002.tif"
+        )
+        sourceKeys.forEach { putObject(it) }
+        assertTrue(sourceKeys.all { keyExists(it) }, "Source S3 keys should exist before run")
+
+        emptyPrefixRunner.enqueue(inputJson)
+        emptyPrefixRunner.run()
+        emptyPrefixRunner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
+
+        // S3: source keys must be gone
+        val remainingSourceKeys = listAllKeys().filter { it.startsWith("$folderA/") }
+        assertTrue(
+            remainingSourceKeys.isEmpty(),
+            "All source S3 keys should be deleted after cross-item move with empty prefix; found: $remainingSourceKeys"
+        )
+
+        // S3: destination keys must exist without a leading slash
+        listOf(1, 2).forEach { page ->
+            val pageStr = "%05d".format(page)
+            assertTrue(
+                keyExists("$folderB/representations/access/data/${folderB}_$pageStr.tif"),
+                "Destination access S3 key (no prefix) should exist for page $page"
+            )
+            assertTrue(
+                keyExists("$folderB/representations/primary/data/${folderB}_$pageStr.tif"),
+                "Destination primary S3 key (no prefix) should exist for page $page"
+            )
+        }
+
+        assertTrue(
+            listAllKeys().none { it.startsWith("tmp_") },
+            "No temp keys should remain after successful run"
+        )
+    }
+
+    @Test
     fun `addInstruction preserves jp2 file extension when provided`() {
         val itemId = UUIDv7.randomUUID().toString()
-        val jp2Images = mapper.readValue("""["tekst_${itemId}_doc.jp2"]""", JsonNode::class.java)
+        val folderName = "tekst_$itemId"
+        val jp2Images = mapper.readValue("""["${folderName}_00001.jp2"]""", JsonNode::class.java)
 
         val instructions = reorderFiles.addInstruction(itemId, jp2Images, "%05d", baseDir)
 
         assertEquals(1, instructions.size)
-        assertEquals("tekst_${itemId}_00001.jp2", instructions[0].newName)
+        assertEquals("${folderName}_00001.jp2", instructions[0].originalName)
+        assertEquals("${folderName}_00001.jp2", instructions[0].newName)
     }
 
     @Test
