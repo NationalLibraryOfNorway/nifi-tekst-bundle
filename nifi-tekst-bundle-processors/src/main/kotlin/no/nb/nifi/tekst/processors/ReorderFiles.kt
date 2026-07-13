@@ -178,8 +178,8 @@ class ReorderFiles(
                             val newName = "$TEKST_PREFIX${itemId}_$pageNumber.$ext"
                             requireWithinBaseDir(baseDirPath, baseDirPath.resolve(sourceFolderName).resolve(originalName))
                             requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
-                        listOfInstructions.add(RenameInstruction(originalName, newName))
-                    }
+                            listOfInstructions.add(RenameInstruction(originalName, newName))
+                        }
                 }
             }
         }
@@ -233,7 +233,8 @@ class ReorderFiles(
                 val deleted = itemDir.toFile().deleteRecursively()
                 if (!deleted) logger.warn("Failed to fully delete emptied source folder: {}", itemDir)
             }
-            deleteAllKeysWithPrefix(client, bucket, "$prefix/$folder/")
+            val keyPrefix = if (prefix.isBlank()) "$folder/" else "$prefix/$folder/"
+            deleteAllKeysWithPrefix(client, bucket, keyPrefix)
         }
     }
 
