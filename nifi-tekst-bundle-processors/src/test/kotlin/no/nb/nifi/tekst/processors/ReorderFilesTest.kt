@@ -178,7 +178,7 @@ class ReorderFilesTest : S3TestBase() {
     }
 
     @Test
-    fun `deleteOcrFiles removes all xml files in ocr folder but keeps the folder`() {
+    fun `deleteDocwizzArtifacts removes all xml files in ocr folder but keeps the folder`() {
         val itemId = UUIDv7.randomUUID().toString()
         val folderName = "tekst_$itemId"
         val ocrDir = baseDir.resolve("$folderName/representations/access/metadata/other/ocr").toFile()
@@ -189,7 +189,7 @@ class ReorderFilesTest : S3TestBase() {
         assertTrue(file1.exists())
         assertTrue(file2.exists())
 
-        reorderFiles.deleteOcrFiles(itemId, baseDir)
+        reorderFiles.deleteDocwizzArtifacts(itemId, baseDir)
 
         assertTrue(ocrDir.exists())
         assertTrue(ocrDir.isDirectory)
@@ -197,7 +197,7 @@ class ReorderFilesTest : S3TestBase() {
     }
 
     @Test
-    fun `deleteOcrFiles removes files from both access and primary representations`() {
+    fun `deleteDocwizzArtifacts removes files from both access and primary representations`() {
         val itemId = UUIDv7.randomUUID().toString()
         val folderName = "tekst_$itemId"
 
@@ -216,7 +216,7 @@ class ReorderFilesTest : S3TestBase() {
         assertTrue(accessFile1.exists() && accessFile2.exists())
         assertTrue(primaryFile1.exists() && primaryFile2.exists())
 
-        reorderFiles.deleteOcrFiles(itemId, baseDir)
+        reorderFiles.deleteDocwizzArtifacts(itemId, baseDir)
 
         // Both folders should exist but be empty
         assertTrue(accessOcrDir.exists() && accessOcrDir.isDirectory)
@@ -226,7 +226,7 @@ class ReorderFilesTest : S3TestBase() {
     }
 
     @Test
-    fun `deleteOcrFiles removes files from primary only when access does not exist`() {
+    fun `deleteDocwizzArtifacts removes files from primary only when access does not exist`() {
         val itemId = UUIDv7.randomUUID().toString()
         val folderName = "tekst_$itemId"
 
@@ -242,7 +242,7 @@ class ReorderFilesTest : S3TestBase() {
             "Access OCR directory should not exist"
         )
 
-        reorderFiles.deleteOcrFiles(itemId, baseDir)
+        reorderFiles.deleteDocwizzArtifacts(itemId, baseDir)
 
         // Primary folder should exist but be empty
         assertTrue(primaryOcrDir.exists() && primaryOcrDir.isDirectory)
@@ -250,7 +250,7 @@ class ReorderFilesTest : S3TestBase() {
     }
 
     @Test
-    fun `deleteOcrFiles removes all content types including nested directories`() {
+    fun `deleteDocwizzArtifacts removes all content types including nested directories`() {
         val itemId = UUIDv7.randomUUID().toString()
         val folderName = "tekst_$itemId"
         val ocrDir = baseDir.resolve("$folderName/representations/access/metadata/other/ocr").toFile()
@@ -265,14 +265,14 @@ class ReorderFilesTest : S3TestBase() {
 
         assertTrue(xml.exists() && txt.exists() && bin.exists() && nested.exists() && nestedFile.exists())
 
-        reorderFiles.deleteOcrFiles(itemId, baseDir)
+        reorderFiles.deleteDocwizzArtifacts(itemId, baseDir)
 
         assertTrue(ocrDir.exists() && ocrDir.isDirectory)
         assertEquals(0, ocrDir.listFiles()?.size ?: -1, "OCR directory should be emptied completely")
     }
 
     @Test
-    fun `deleteOcrFiles also removes docwizz marker files recursively across item folder`() {
+    fun `deleteDocwizzArtifacts also removes docwizz marker files recursively across item folder`() {
         val itemId = UUIDv7.randomUUID().toString()
         val folderName = "tekst_$itemId"
         val itemDir = baseDir.resolve(folderName).toFile().apply { mkdirs() }
@@ -286,7 +286,7 @@ class ReorderFilesTest : S3TestBase() {
 
         assertTrue(rootRdy.exists() && nestedTkn.exists() && deepWrk.exists() && keepFile.exists())
 
-        reorderFiles.deleteOcrFiles(itemId, baseDir)
+        reorderFiles.deleteDocwizzArtifacts(itemId, baseDir)
 
         assertFalse(rootRdy.exists(), "Root .rdy file should be deleted")
         assertFalse(nestedTkn.exists(), "Nested .tkn file should be deleted")

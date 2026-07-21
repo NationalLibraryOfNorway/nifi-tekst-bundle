@@ -239,7 +239,12 @@ class ReorderFiles(
         }
     }
 
-    fun deleteOcrFiles(itemId: String, baseDirPath: Path) {
+    /**
+     * Deletes all DocWizz-produced artifacts for the given item:
+     * - OCR output files from both `access` and `primary` representation directories
+     * - DocWizz marker files (e.g. `.docwizz`) scattered anywhere under the item directory
+     */
+    fun deleteDocwizzArtifacts(itemId: String, baseDirPath: Path) {
         // itemId must be validated before calling this function
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
         val folderName = "$TEKST_PREFIX$itemId"
@@ -268,10 +273,10 @@ class ReorderFiles(
             }
         }
 
-        deleteDocwizzFiles(itemId, baseDirPath)
+        deleteDocwizzMarkerFiles(itemId, baseDirPath)
     }
 
-    private fun deleteDocwizzFiles(itemId: String, baseDirPath: Path) {
+    private fun deleteDocwizzMarkerFiles(itemId: String, baseDirPath: Path) {
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
         val itemDir = baseDirPath.resolve("$TEKST_PREFIX$itemId").normalize()
         requireWithinBaseDir(baseDirPath, itemDir)
@@ -384,7 +389,7 @@ class ReorderFiles(
                     .mapNotNull { extractIdFromFilename(it.originalName) }
                     .map { it.removePrefix(TEKST_PREFIX) }
                 val allItemIdsForOcrCleanup = (itemIds + sourceItemIds).toSet()
-                allItemIdsForOcrCleanup.forEach { itemId -> deleteOcrFiles(itemId, baseDirPath) }
+                allItemIdsForOcrCleanup.forEach { itemId -> deleteDocwizzArtifacts(itemId, baseDirPath) }
 
                 cleanupEmptiedSourceFolders(baseDirPath, renameInstructions, client, bucket, prefix)
 
