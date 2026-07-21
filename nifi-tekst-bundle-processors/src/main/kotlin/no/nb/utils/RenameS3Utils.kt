@@ -45,33 +45,54 @@ object RenameS3Utils {
             return
         }
 
-        logger.info("Starting S3 rename of ${effectiveRenames.size} instructions in bucket '$bucket'")
+        // S3 stores only .tif keys. When both .tif and .jp2 exist on disk for the same page,
+        // addInstruction produces two rename instructions that normalize to the same S3 operation.
+        // Deduplicate by (normalised source key, normalised destination key) so each S3 key is
+        // staged exactly once.
+        val s3Renames = effectiveRenames.distinctBy { Pair(toS3Filename(it.originalName), toS3Filename(it.newName)) }
+        if (s3Renames.size < effectiveRenames.size) {
+            logger.debug(
+                "Deduplicated {} disk instructions to {} S3 instructions (multiple on-disk formats share one S3 key)",
+                effectiveRenames.size, s3Renames.size
+            )
+        }
+
+        logger.info("Starting S3 rename of ${s3Renames.size} instructions in bucket '$bucket'")
 
         val staged = mutableListOf<StagedS3File>()
 
         // Staging: Copy all originals to temp/stage
         // This ensures swap/cycle conflicts (e.g. A→B and B→A) are handled safely.
         try {
-            for (instruction in effectiveRenames) {
+            for (instruction in s3Renames) {
                 val sourceId = extractIdFromFilename(instruction.originalName)
                     ?: throw IllegalArgumentException("Could not extract sourceId from '${instruction.originalName}'")
                 val targetId = extractIdFromFilename(instruction.newName)
                     ?: throw IllegalArgumentException("Could not extract targetId from '${instruction.newName}'")
 
+                var foundInAnyRepresentation = false
+
                 for (representation in KEY_REPRESENTATIONS) {
-                    val sourceKey = buildKey(prefix, sourceId, representation, instruction.originalName)
-                    val finalKey = buildKey(prefix, targetId, representation, instruction.newName)
+                    val sourceKey = buildKey(prefix, sourceId, representation, toS3Filename(instruction.originalName))
+                    val finalKey = buildKey(prefix, targetId, representation, toS3Filename(instruction.newName))
                     val tempKey = "tmp_${UUIDv7.randomUUID()}_${instruction.originalName}"
 
                     if (!keyExists(client, bucket, sourceKey)) {
-                        throw IllegalStateException(
-                            "Source key not found in bucket '$bucket': '$sourceKey'. " +
-                                    "S3 structure may be out of sync with disk. Aborting rename."
-                        )
+                        logger.debug("Source key not found in representation '$representation', skipping: '$sourceKey'")
+                        continue
                     }
 
+                    foundInAnyRepresentation = true
                     copyObjectWithinBucket(client, bucket, sourceKey, tempKey)
                     staged.add(StagedS3File(sourceKey, tempKey, finalKey))
+                }
+
+                if (!foundInAnyRepresentation) {
+                    throw IllegalStateException(
+                        "Source file '${instruction.originalName}' not found in any representation (access or primary) " +
+                                "for itemId '$sourceId' in bucket '$bucket'. " +
+                                "S3 structure may be out of sync with disk. Aborting rename."
+                    )
                 }
             }
         } catch (e: Exception) {
@@ -110,10 +131,21 @@ object RenameS3Utils {
         batchDelete(client, bucket, originalKeysToDelete)
         batchDelete(client, bucket, staged.map { it.tempKey })
 
-        logger.info("S3 rename complete — ${effectiveRenames.size} instructions processed, ${originalKeysToDelete.size} original keys deleted from bucket '$bucket'")
+        logger.info("S3 rename complete — ${s3Renames.size} instructions processed, ${originalKeysToDelete.size} original keys deleted from bucket '$bucket'")
     }
 
     private fun buildKey(prefix: String?, itemId: String, representation: String, filename: String): String =
         if (prefix.isNullOrBlank()) "$itemId/$representation/$filename"
         else "$prefix/$itemId/$representation/$filename"
+
+    /**
+     * S3 always stores image files with a .tif extension, regardless of the on-disk format
+     * (e.g. .jp2 files on disk have a corresponding .tif key in S3).
+     * Normalises .jp2 and .tiff extensions to .tif when building S3 keys.
+     */
+    private fun toS3Filename(filename: String): String {
+        val ext = filename.substringAfterLast('.', "").lowercase()
+        return if (ext == "jp2" || ext == "tiff") "${filename.substringBeforeLast('.')}.tif"
+        else filename
+    }
 }

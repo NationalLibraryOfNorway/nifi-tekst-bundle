@@ -132,22 +132,56 @@ class ReorderFiles(
             val rawName = imageName.asText()
             require(isSafeName(rawName)) { "Invalid image name: $rawName" }
             val prefixedName = if (rawName.startsWith(TEKST_PREFIX)) rawName else "$TEKST_PREFIX$rawName"
-
-            val originalName = when {
-                prefixedName.endsWith(".tif", ignoreCase = true) -> prefixedName
-                prefixedName.endsWith(".tiff", ignoreCase = true) -> prefixedName
-                prefixedName.substringAfterLast('.', prefixedName) != prefixedName -> prefixedName
-                else -> "$prefixedName.tif"  // default to .tif only if no extension
-            }
             val pageNumber = String.format(zeroPadding, index + 1)
-            val extension = originalName.substringAfterLast('.')
-            val newName = "$TEKST_PREFIX${itemId}_$pageNumber.$extension"
 
-            // Verify both original and new paths stay within base dir
-            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(originalName))
-            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
+            val hasExplicitExtension = prefixedName.endsWith(".tif", ignoreCase = true)
+                    || prefixedName.endsWith(".tiff", ignoreCase = true)
+                    || prefixedName.endsWith(".jp2", ignoreCase = true)
+                    || prefixedName.substringAfterLast('.', prefixedName) != prefixedName
 
-            listOfInstructions.add(RenameInstruction(originalName, newName))
+            if (hasExplicitExtension) {
+                val extension = prefixedName.substringAfterLast('.')
+                val newName = "$TEKST_PREFIX${itemId}_$pageNumber.$extension"
+                requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(prefixedName))
+                requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
+                listOfInstructions.add(RenameInstruction(prefixedName, newName))
+            } else {
+                    // No extension given — find ALL matching files on disk and create one instruction per extension.
+                    // Probe in the SOURCE folder (derived from the filename itself), not the target folder,
+                    // because cross-item moves have source files in a different folder than the target itemId.
+                    val sourceFolderName = prefixedName.substringBeforeLast('_')
+                    require(isSafeName(sourceFolderName)) { "Invalid source folder derived from filename: $sourceFolderName" }
+                    val supportedExtensions = listOf("tif", "tiff", "jp2")
+                    val probeDirs = listOf("access", "primary").map {
+                        baseDirPath.resolve(sourceFolderName).resolve("representations/$it/data")
+                    }
+                    val discoveredExtensions = supportedExtensions.filter { ext ->
+                        probeDirs.any { dir -> Files.exists(dir.resolve("$prefixedName.$ext")) }
+                    }
+
+                    if (discoveredExtensions.isEmpty()) {
+                        logger.warn(
+                            "No file found on disk for '{}' with any supported extension, defaulting to .tif", prefixedName
+                        )
+                        val originalName = "$prefixedName.tif"
+                        val newName = "$TEKST_PREFIX${itemId}_$pageNumber.tif"
+                        requireWithinBaseDir(baseDirPath, baseDirPath.resolve(sourceFolderName).resolve(originalName))
+                        requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
+                        listOfInstructions.add(RenameInstruction(originalName, newName))
+                    } else {
+                        logger.debug(
+                            "Discovered extensions {} for '{}', adding one rename instruction per extension",
+                            discoveredExtensions, prefixedName
+                        )
+                        discoveredExtensions.forEach { ext ->
+                            val originalName = "$prefixedName.$ext"
+                            val newName = "$TEKST_PREFIX${itemId}_$pageNumber.$ext"
+                            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(sourceFolderName).resolve(originalName))
+                            requireWithinBaseDir(baseDirPath, baseDirPath.resolve(folderName).resolve(newName))
+                            listOfInstructions.add(RenameInstruction(originalName, newName))
+                        }
+                }
+            }
         }
 
         return listOfInstructions
@@ -199,7 +233,8 @@ class ReorderFiles(
                 val deleted = itemDir.toFile().deleteRecursively()
                 if (!deleted) logger.warn("Failed to fully delete emptied source folder: {}", itemDir)
             }
-            deleteAllKeysWithPrefix(client, bucket, "$prefix/$folder/")
+            val keyPrefix = if (prefix.isBlank()) "$folder/" else "$prefix/$folder/"
+            deleteAllKeysWithPrefix(client, bucket, keyPrefix)
         }
     }
 
@@ -207,26 +242,29 @@ class ReorderFiles(
         // itemId must be validated before calling this function
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
         val folderName = "$TEKST_PREFIX$itemId"
-        val ocrDirPath =
-            baseDirPath.resolve(folderName).resolve("representations/access/metadata/other/ocr").normalize()
 
-        logger.info("Attempting to delete OCR files for itemId={} in directory: {}", itemId, ocrDirPath)
+        // Delete OCR files from both access and primary representations
+        listOf("access", "primary").forEach { representation ->
+            val ocrDirPath =
+                baseDirPath.resolve(folderName).resolve("representations/$representation/metadata/other/ocr").normalize()
 
-        // Ensure ocr dir is within base dir
-        requireWithinBaseDir(baseDirPath, ocrDirPath)
+            logger.info("Attempting to delete OCR files for itemId={} in representation='{}': {}", itemId, representation, ocrDirPath)
 
-        val ocrDir = ocrDirPath.toFile()
-        if (ocrDir.exists() && ocrDir.isDirectory) {
-            val files =
-                ocrDir.listFiles()?.filter { it.isFile && it.name.endsWith(".xml", ignoreCase = true) } ?: emptyList()
-            logger.info("Found {} OCR XML files to delete in {}", files.size, ocrDirPath)
-            files.forEach { file ->
-                requireWithinBaseDir(baseDirPath, file.toPath())
-                file.delete()
-                logger.debug("Deleted OCR file '{}'", file.absolutePath)
+            // Ensure ocr dir is within base dir
+            requireWithinBaseDir(baseDirPath, ocrDirPath)
+
+            val ocrDir = ocrDirPath.toFile()
+            if (ocrDir.exists() && ocrDir.isDirectory) {
+                val entries = ocrDir.listFiles()?.toList() ?: emptyList()
+                logger.info("Found {} entries to delete in {}", entries.size, ocrDirPath)
+                entries.forEach { entry ->
+                    requireWithinBaseDir(baseDirPath, entry.toPath())
+                    entry.deleteRecursively()
+                    logger.debug("Deleted OCR entry '{}'", entry.absolutePath)
+                }
+            } else {
+                logger.debug("OCR directory does not exist or is not a directory: {}", ocrDirPath)
             }
-        } else {
-            logger.info("OCR directory does not exist or is not a directory: {}", ocrDirPath)
         }
     }
 
@@ -268,7 +306,7 @@ class ReorderFiles(
             val secretKey = context.getProperty(SECRET_KEY).value
             val region = context.getProperty(REGION).evaluateAttributeExpressions(flowFile).value
             val endpoint = context.getProperty(ENDPOINT).evaluateAttributeExpressions(flowFile).value
-            val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value.trimEnd('/')
+            val prefix = context.getProperty(PREFIX).evaluateAttributeExpressions(flowFile).value?.trimEnd('/') ?: ""
             val client = getS3Client(accessKey, secretKey, region, endpoint)
             val zeroPadding =
                 context.getProperty(RENAME_ZERO_PAD_STRING).evaluateAttributeExpressions(flowFile).value ?: "%05d"
@@ -315,7 +353,11 @@ class ReorderFiles(
                     throw e
                 }
 
-                itemIds.forEach { itemId -> deleteOcrFiles(itemId, baseDirPath) }
+                val sourceItemIds = renameInstructions
+                    .mapNotNull { extractIdFromFilename(it.originalName) }
+                    .map { it.removePrefix(TEKST_PREFIX) }
+                val allItemIdsForOcrCleanup = (itemIds + sourceItemIds).toSet()
+                allItemIdsForOcrCleanup.forEach { itemId -> deleteOcrFiles(itemId, baseDirPath) }
 
                 cleanupEmptiedSourceFolders(baseDirPath, renameInstructions, client, bucket, prefix)
 

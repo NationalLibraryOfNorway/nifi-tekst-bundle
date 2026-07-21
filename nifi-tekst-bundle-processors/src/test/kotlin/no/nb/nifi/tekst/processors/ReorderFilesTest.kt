@@ -197,6 +197,81 @@ class ReorderFilesTest : S3TestBase() {
     }
 
     @Test
+    fun `deleteOcrFiles removes files from both access and primary representations`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+
+        // Create OCR files in access
+        val accessOcrDir = baseDir.resolve("$folderName/representations/access/metadata/other/ocr").toFile()
+        accessOcrDir.mkdirs()
+        val accessFile1 = File(accessOcrDir, "${folderName}_00001.xml").apply { writeText("access-ocr-1") }
+        val accessFile2 = File(accessOcrDir, "${folderName}_00002.xml").apply { writeText("access-ocr-2") }
+
+        // Create OCR files in primary
+        val primaryOcrDir = baseDir.resolve("$folderName/representations/primary/metadata/other/ocr").toFile()
+        primaryOcrDir.mkdirs()
+        val primaryFile1 = File(primaryOcrDir, "${folderName}_00001.xml").apply { writeText("primary-ocr-1") }
+        val primaryFile2 = File(primaryOcrDir, "${folderName}_00002.xml").apply { writeText("primary-ocr-2") }
+
+        assertTrue(accessFile1.exists() && accessFile2.exists())
+        assertTrue(primaryFile1.exists() && primaryFile2.exists())
+
+        reorderFiles.deleteOcrFiles(itemId, baseDir)
+
+        // Both folders should exist but be empty
+        assertTrue(accessOcrDir.exists() && accessOcrDir.isDirectory)
+        assertTrue(primaryOcrDir.exists() && primaryOcrDir.isDirectory)
+        assertEquals(0, accessOcrDir.listFiles()?.size ?: -1)
+        assertEquals(0, primaryOcrDir.listFiles()?.size ?: -1)
+    }
+
+    @Test
+    fun `deleteOcrFiles removes files from primary only when access does not exist`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+
+        // Create OCR files only in primary (access folder does not exist)
+        val primaryOcrDir = baseDir.resolve("$folderName/representations/primary/metadata/other/ocr").toFile()
+        primaryOcrDir.mkdirs()
+        val primaryFile1 = File(primaryOcrDir, "${folderName}_00001.xml").apply { writeText("primary-ocr-1") }
+        val primaryFile2 = File(primaryOcrDir, "${folderName}_00002.xml").apply { writeText("primary-ocr-2") }
+
+        assertTrue(primaryFile1.exists() && primaryFile2.exists())
+        assertFalse(
+            baseDir.resolve("$folderName/representations/access/metadata/other/ocr").toFile().exists(),
+            "Access OCR directory should not exist"
+        )
+
+        reorderFiles.deleteOcrFiles(itemId, baseDir)
+
+        // Primary folder should exist but be empty
+        assertTrue(primaryOcrDir.exists() && primaryOcrDir.isDirectory)
+        assertEquals(0, primaryOcrDir.listFiles()?.size ?: -1)
+    }
+
+    @Test
+    fun `deleteOcrFiles removes all content types including nested directories`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+        val ocrDir = baseDir.resolve("$folderName/representations/access/metadata/other/ocr").toFile()
+        ocrDir.mkdirs()
+
+        // Mixed contents: xml, txt, bin and nested directory with files
+        val xml = File(ocrDir, "${folderName}_00001.xml").apply { writeText("xml") }
+        val txt = File(ocrDir, "readme.txt").apply { writeText("txt") }
+        val bin = File(ocrDir, "blob.bin").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val nested = File(ocrDir, "nested").apply { mkdirs() }
+        val nestedFile = File(nested, "nested.json").apply { writeText("{}") }
+
+        assertTrue(xml.exists() && txt.exists() && bin.exists() && nested.exists() && nestedFile.exists())
+
+        reorderFiles.deleteOcrFiles(itemId, baseDir)
+
+        assertTrue(ocrDir.exists() && ocrDir.isDirectory)
+        assertEquals(0, ocrDir.listFiles()?.size ?: -1, "OCR directory should be emptied completely")
+    }
+
+    @Test
     fun `processor generates a valid uuid for items missing itemId in flowfile`() {
         val changeList = mutableListOf<Map<String, Any>>()
         for (change in changes) {
@@ -325,5 +400,275 @@ class ReorderFilesTest : S3TestBase() {
             listAllKeys().none { it.startsWith("tmp_") },
             "No temp keys should remain after successful run"
         )
+    }
+
+    @Test
+    fun `when moving subset of files from item A to item B, source OCR files are deleted even if source folder remains`() {
+        val itemA = "019a3aa3-d0af-7658-9a44-cccccccccccc"
+        val itemB = "019a3aa3-d0af-7658-9a44-dddddddddddd"
+        val folderA = "tekst_$itemA"
+        val folderB = "tekst_$itemB"
+
+        val movedSourceName = "${folderA}_00001.tif"
+        val remainingSourceName = "${folderA}_00002.tif"
+
+        val inputJson = """
+            {
+              "batchId": "test-batch-partial-move",
+              "changes": [
+                {
+                  "itemId": "$itemB",
+                  "orderedImageIds": [
+                    "${folderA}_00001"
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        // Seed disk for moved file
+        TestFileUtils.createFile(baseDir, "access", movedSourceName)
+        TestFileUtils.createFile(baseDir, "primary", movedSourceName)
+
+        // Keep one file in item A so source folder is not fully emptied
+        val remainingAccess = TestFileUtils.createFile(baseDir, "access", remainingSourceName)
+        val remainingPrimary = TestFileUtils.createFile(baseDir, "primary", remainingSourceName)
+
+        // Seed OCR in item A for both representations
+        val accessOcrDir = baseDir.resolve("$folderA/representations/access/metadata/other/ocr").toFile().apply { mkdirs() }
+        val primaryOcrDir = baseDir.resolve("$folderA/representations/primary/metadata/other/ocr").toFile().apply { mkdirs() }
+        val accessOcr = File(accessOcrDir, "${folderA}_00001.xml").apply { writeText("access-ocr") }
+        val primaryOcr = File(primaryOcrDir, "${folderA}_00001.xml").apply { writeText("primary-ocr") }
+
+        // Seed S3 for moved file
+        putObject("$testPrefix/$folderA/representations/access/data/$movedSourceName")
+        putObject("$testPrefix/$folderA/representations/primary/data/$movedSourceName")
+
+        runner.enqueue(inputJson)
+        runner.run()
+        runner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
+
+        // Source folder should remain because one data file is still present
+        assertTrue(baseDir.resolve(folderA).toFile().exists(), "Item A folder should remain after partial move")
+        assertTrue(remainingAccess.exists(), "Unmoved source access file should remain")
+        assertTrue(remainingPrimary.exists(), "Unmoved source primary file should remain")
+
+        // Source OCR must still be deleted
+        assertFalse(accessOcr.exists(), "Source access OCR should be deleted")
+        assertFalse(primaryOcr.exists(), "Source primary OCR should be deleted")
+
+        // Moved file should now exist under item B
+        assertTrue(
+            baseDir.resolve("$folderB/representations/access/data/${folderB}_00001.tif").toFile().exists(),
+            "Renamed access file should exist under target item"
+        )
+        assertTrue(
+            baseDir.resolve("$folderB/representations/primary/data/${folderB}_00001.tif").toFile().exists(),
+            "Renamed primary file should exist under target item"
+        )
+    }
+
+    @Test
+    fun `cross-item move with empty prefix deletes source S3 keys and creates destination keys without leading slash`() {
+        val itemA = "019a3aa3-d0af-7658-9a44-eeeeeeeeeeee"
+        val itemB = "019a3aa3-d0af-7658-9a44-ffffffffffff"
+        val folderA = "tekst_$itemA"
+        val folderB = "tekst_$itemB"
+
+        val emptyPrefixRunner = setupTestRunner(ReorderFiles()).apply {
+            setProperty(ReorderFiles.PREFIX, "")
+            assertValid()
+        }
+
+        val inputJson = """
+            {
+              "batchId": "test-empty-prefix",
+              "changes": [
+                {
+                  "itemId": "$itemB",
+                  "orderedImageIds": [
+                    "${folderA}_00001",
+                    "${folderA}_00002"
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        // Seed disk: item A has 2 .tif files in access + primary
+        TestFileUtils.createFile(baseDir, "access", "${folderA}_00001.tif")
+        TestFileUtils.createFile(baseDir, "access", "${folderA}_00002.tif")
+        TestFileUtils.createFile(baseDir, "primary", "${folderA}_00001.tif")
+        TestFileUtils.createFile(baseDir, "primary", "${folderA}_00002.tif")
+
+        // Seed S3 WITHOUT any prefix (top-level keys)
+        val sourceKeys = listOf(
+            "$folderA/representations/access/data/${folderA}_00001.tif",
+            "$folderA/representations/access/data/${folderA}_00002.tif",
+            "$folderA/representations/primary/data/${folderA}_00001.tif",
+            "$folderA/representations/primary/data/${folderA}_00002.tif"
+        )
+        sourceKeys.forEach { putObject(it) }
+        assertTrue(sourceKeys.all { keyExists(it) }, "Source S3 keys should exist before run")
+
+        emptyPrefixRunner.enqueue(inputJson)
+        emptyPrefixRunner.run()
+        emptyPrefixRunner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
+
+        // S3: source keys must be gone
+        val remainingSourceKeys = listAllKeys().filter { it.startsWith("$folderA/") }
+        assertTrue(
+            remainingSourceKeys.isEmpty(),
+            "All source S3 keys should be deleted after cross-item move with empty prefix; found: $remainingSourceKeys"
+        )
+
+        // S3: destination keys must exist without a leading slash
+        listOf(1, 2).forEach { page ->
+            val pageStr = "%05d".format(page)
+            assertTrue(
+                keyExists("$folderB/representations/access/data/${folderB}_$pageStr.tif"),
+                "Destination access S3 key (no prefix) should exist for page $page"
+            )
+            assertTrue(
+                keyExists("$folderB/representations/primary/data/${folderB}_$pageStr.tif"),
+                "Destination primary S3 key (no prefix) should exist for page $page"
+            )
+        }
+
+        assertTrue(
+            listAllKeys().none { it.startsWith("tmp_") },
+            "No temp keys should remain after successful run"
+        )
+    }
+
+    @Test
+    fun `addInstruction preserves jp2 file extension when provided`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+        val jp2Images = mapper.readValue("""["${folderName}_00001.jp2"]""", JsonNode::class.java)
+
+        val instructions = reorderFiles.addInstruction(itemId, jp2Images, "%05d", baseDir)
+
+        assertEquals(1, instructions.size)
+        assertEquals("${folderName}_00001.jp2", instructions[0].originalName)
+        assertEquals("${folderName}_00001.jp2", instructions[0].newName)
+    }
+
+    @Test
+    fun `addInstruction discovers jp2 extension from disk when no extension given`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+        val originalFilename = "${folderName}_00001"
+
+        // Create only a .jp2 file on disk — no .tif exists
+        TestFileUtils.createFile(baseDir, "access", "$originalFilename.jp2")
+
+        val images = mapper.readValue("""["$originalFilename"]""", JsonNode::class.java)
+        val instructions = reorderFiles.addInstruction(itemId, images, "%05d", baseDir)
+
+        assertEquals(1, instructions.size)
+        assertEquals("$originalFilename.jp2", instructions[0].originalName,
+            "Should discover .jp2 from disk instead of defaulting to .tif")
+        assertEquals("${folderName}_00001.jp2", instructions[0].newName,
+            "New name should preserve the discovered .jp2 extension")
+    }
+
+    @Test
+    fun `addInstruction discovers extension from source item folder during cross-item move`() {
+        val sourceItemId = "019eab0f-8ca5-7936-b4ea-0a0aeeb51b6c"
+        val targetItemId = "019eab0f-8ca5-7936-b4ea-0a09af2e3da4"
+        val sourceFolderName = "tekst_$sourceItemId"
+
+        // Source file is a .jp2 in the SOURCE folder — no .tif exists anywhere
+        TestFileUtils.createFile(baseDir, "access", "${sourceFolderName}_00001.jp2")
+
+        val images = mapper.readValue("""["${sourceFolderName}_00001"]""", JsonNode::class.java)
+        val instructions = reorderFiles.addInstruction(targetItemId, images, "%05d", baseDir)
+
+        assertEquals(1, instructions.size)
+        assertEquals("${sourceFolderName}_00001.jp2", instructions[0].originalName,
+            "Should find .jp2 in the source item's folder, not the target folder")
+        assertEquals("tekst_${targetItemId}_00001.jp2", instructions[0].newName,
+            "New name should use target itemId with discovered .jp2 extension")
+    }
+
+    @Test
+    fun `addInstruction creates one instruction per extension when both tif and jp2 exist and no extension given`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+        val originalFilename = "${folderName}_00001"
+
+        // Create both .tif and .jp2 on disk
+        TestFileUtils.createFile(baseDir, "access", "$originalFilename.tif")
+        TestFileUtils.createFile(baseDir, "access", "$originalFilename.jp2")
+
+        val images = mapper.readValue("""["$originalFilename"]""", JsonNode::class.java)
+        val instructions = reorderFiles.addInstruction(itemId, images, "%05d", baseDir)
+
+        assertEquals(2, instructions.size, "Should produce one instruction per discovered extension")
+        val originals = instructions.map { it.originalName }.toSet()
+        val newNames = instructions.map { it.newName }.toSet()
+        assertTrue(originals.contains("$originalFilename.tif"), "Should include .tif instruction")
+        assertTrue(originals.contains("$originalFilename.jp2"), "Should include .jp2 instruction")
+        assertTrue(newNames.contains("${folderName}_00001.tif"))
+        assertTrue(newNames.contains("${folderName}_00001.jp2"))
+    }
+
+    @Test
+    fun `processor handles mixed tif and jp2 files correctly`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+
+        // Create mix of .tif and .jp2 files in both representations on disk
+        TestFileUtils.createFile(baseDir, "access", "${folderName}_00001.tif")
+        TestFileUtils.createFile(baseDir, "access", "${folderName}_00002.jp2")
+        TestFileUtils.createFile(baseDir, "primary", "${folderName}_00001.tif")
+        TestFileUtils.createFile(baseDir, "primary", "${folderName}_00002.jp2")
+
+        // S3 always stores .tif keys regardless of the on-disk format
+        putObject("$testPrefix/$folderName/representations/access/data/${folderName}_00001.tif")
+        putObject("$testPrefix/$folderName/representations/access/data/${folderName}_00002.tif")
+        putObject("$testPrefix/$folderName/representations/primary/data/${folderName}_00001.tif")
+        putObject("$testPrefix/$folderName/representations/primary/data/${folderName}_00002.tif")
+
+        // Reorder: swap positions (jp2 moves to position 1, tif moves to position 2)
+        val inputJson = """
+            {
+              "batchId": "test-mixed-ext",
+              "changes": [
+                {
+                  "itemId": "$itemId",
+                  "orderedImageIds": [
+                    "${folderName}_00002.jp2",
+                    "${folderName}_00001.tif"
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        runner.enqueue(inputJson)
+        runner.run()
+        runner.assertAllFlowFilesTransferred(ReorderFiles.REL_SUCCESS, 1)
+
+        // Disk: extensions must be preserved in new positions
+        assertTrue(baseDir.resolve("$folderName/representations/access/data/${folderName}_00001.jp2").toFile().exists(),
+            "Renamed access .jp2 should exist at position 1")
+        assertTrue(baseDir.resolve("$folderName/representations/access/data/${folderName}_00002.tif").toFile().exists(),
+            "Renamed access .tif should exist at position 2")
+        assertTrue(baseDir.resolve("$folderName/representations/primary/data/${folderName}_00001.jp2").toFile().exists(),
+            "Renamed primary .jp2 should exist at position 1")
+        assertTrue(baseDir.resolve("$folderName/representations/primary/data/${folderName}_00002.tif").toFile().exists(),
+            "Renamed primary .tif should exist at position 2")
+
+        // S3: keys are always .tif, moved to new positions
+        assertTrue(keyExists("$testPrefix/$folderName/representations/access/data/${folderName}_00001.tif"),
+            "S3 access key at new position 1 should be .tif")
+        assertTrue(keyExists("$testPrefix/$folderName/representations/access/data/${folderName}_00002.tif"),
+            "S3 access key at new position 2 should be .tif")
+        assertTrue(keyExists("$testPrefix/$folderName/representations/primary/data/${folderName}_00001.tif"),
+            "S3 primary key at new position 1 should be .tif")
+        assertTrue(keyExists("$testPrefix/$folderName/representations/primary/data/${folderName}_00002.tif"),
+            "S3 primary key at new position 2 should be .tif")
     }
 }

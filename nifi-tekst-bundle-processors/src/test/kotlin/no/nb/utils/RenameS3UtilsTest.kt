@@ -200,6 +200,62 @@ class RenameS3UtilsTest : S3TestBase() {
         }
 
         @Test
+        fun `should rename tif key in S3 only once when both tif and jp2 instructions target the same S3 key`() {
+            // When both .tif and .jp2 exist on disk, addInstruction creates two rename instructions.
+            // S3 only has a .tif key, so only one S3 rename should happen.
+            val originalTif = "${standardFilename}_00003.tif"
+            val originalJp2 = "${standardFilename}_00003.jp2"
+            val newTif = "${standardFilename}_00001.tif"
+            val newJp2 = "${standardFilename}_00001.jp2"
+
+            makeAccessObject(originalTif)
+            makePrimaryObject(originalTif)
+            // No .jp2 keys in S3 — that is the invariant in production
+
+            RenameS3Utils.renameS3Files(
+                s3Client, BUCKET,
+                listOf(
+                    RenameInstruction(originalTif, newTif),
+                    RenameInstruction(originalJp2, newJp2)
+                ),
+                testPrefix
+            )
+
+            assertTrue(keyExists(accessKey(newTif)), "New access .tif key should exist")
+            assertTrue(keyExists(primaryKey(newTif)), "New primary .tif key should exist")
+            assertFalse(keyExists(accessKey(originalTif)), "Original access .tif key should be deleted")
+            assertFalse(keyExists(primaryKey(originalTif)), "Original primary .tif key should be deleted")
+            assertTrue(listAllKeys().none { it.startsWith("tmp_") }, "No temp keys should remain")
+        }
+
+        @Test
+        fun `should rename tif keys in S3 when rename instruction uses jp2 extension`() {
+            // S3 always stores .tif; disk may have .jp2. Instructions are built from disk names,
+            // so the instruction carries .jp2 even though S3 has .tif.
+            val originalJp2 = "${standardFilename}_00003.jp2"
+            val newJp2 = "${standardFilename}_00001.jp2"
+
+            // Seed S3 with .tif keys (as it is in production)
+            makeAccessObject("${standardFilename}_00003.tif")
+            makePrimaryObject("${standardFilename}_00003.tif")
+
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, listOf(RenameInstruction(originalJp2, newJp2)), testPrefix)
+
+            // S3 key at new position should exist as .tif
+            assertTrue(keyExists(accessKey("${standardFilename}_00001.tif")),
+                "New access key should exist as .tif after jp2-instructed rename")
+            assertTrue(keyExists(primaryKey("${standardFilename}_00001.tif")),
+                "New primary key should exist as .tif after jp2-instructed rename")
+            // Original .tif keys should be gone
+            assertFalse(keyExists(accessKey("${standardFilename}_00003.tif")),
+                "Original access .tif key should be deleted")
+            assertFalse(keyExists(primaryKey("${standardFilename}_00003.tif")),
+                "Original primary .tif key should be deleted")
+            assertTrue(listAllKeys().none { it.startsWith("tmp_") },
+                "No temp keys should remain after rename")
+        }
+
+        @Test
         fun `should leave no temp keys after successful rename`() {
             makeAccessObject("${standardFilename}_00001.tif")
             makePrimaryObject("${standardFilename}_00001.tif")
@@ -224,6 +280,44 @@ class RenameS3UtilsTest : S3TestBase() {
 
             assertTrue(keyExists(key), "Key should remain untouched when instructions are empty")
             assertEquals(1, listAllKeys().size, "Bucket should be unchanged")
+        }
+
+        @Test
+        fun `should rename file that exists only in primary representation without access`() {
+            val originalName = "${standardFilename}_00001.tif"
+            val newName = "${standardFilename}_00002.tif"
+
+            // Create file only in primary representation (not in access)
+            makePrimaryObject(originalName)
+            assertFalse(keyExists(accessKey(originalName)), "Original access key should not exist")
+            assertTrue(keyExists(primaryKey(originalName)), "Original primary key should exist")
+
+            // Perform rename
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, listOf(RenameInstruction(originalName, newName)), testPrefix)
+
+            // Verify file exists at new name only in primary
+            assertFalse(keyExists(accessKey(newName)), "New access key should not exist")
+            assertTrue(keyExists(primaryKey(newName)), "New primary key should exist")
+            assertFalse(keyExists(primaryKey(originalName)), "Original primary key should be deleted")
+        }
+
+        @Test
+        fun `should rename file that exists only in access representation without primary`() {
+            val originalName = "${standardFilename}_00001.tif"
+            val newName = "${standardFilename}_00002.tif"
+
+            // Create file only in access representation (not in primary)
+            makeAccessObject(originalName)
+            assertTrue(keyExists(accessKey(originalName)), "Original access key should exist")
+            assertFalse(keyExists(primaryKey(originalName)), "Original primary key should not exist")
+
+            // Perform rename
+            RenameS3Utils.renameS3Files(s3Client, BUCKET, listOf(RenameInstruction(originalName, newName)), testPrefix)
+
+            // Verify file exists at new name only in access
+            assertTrue(keyExists(accessKey(newName)), "New access key should exist")
+            assertFalse(keyExists(primaryKey(newName)), "New primary key should not exist")
+            assertFalse(keyExists(accessKey(originalName)), "Original access key should be deleted")
         }
     }
 

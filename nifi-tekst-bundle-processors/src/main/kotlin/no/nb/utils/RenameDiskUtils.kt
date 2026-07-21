@@ -48,6 +48,8 @@ object RenameDiskUtils {
                 val targetId = extractIdFromFilename(instruction.newName)
                     ?: throw IllegalArgumentException("Could not extract targetId from ${instruction.newName}")
 
+                var foundInAnyRepresentation = false
+
                 listOf("access", "primary").forEach { rep ->
                     val sourceDir = baseDir.resolve("$sourceId/representations/$rep/data").normalize()
                     val targetDir = baseDir.resolve("$targetId/representations/$rep/data").normalize()
@@ -65,9 +67,17 @@ object RenameDiskUtils {
                         return@forEach
                     }
 
+                    foundInAnyRepresentation = true
                     val tempFile = tempDir.resolve("${UUIDv7.randomUUID()}_${instruction.originalName}")
                     Files.move(sourceFile, tempFile, StandardCopyOption.REPLACE_EXISTING)
                     staged.add(StagedFile(sourceFile, tempFile, targetDir, instruction.newName))
+                }
+
+                if (!foundInAnyRepresentation) {
+                    throw IllegalStateException(
+                        "Source file '${instruction.originalName}' not found in any representation (access or primary) " +
+                                "for itemId '$sourceId' under baseDir '$baseDir'. Aborting rename."
+                    )
                 }
             }
 
