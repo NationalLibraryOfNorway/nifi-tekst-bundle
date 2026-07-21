@@ -90,6 +90,7 @@ class ReorderFiles(
             .build()
 
         private const val TEKST_PREFIX = "tekst_"
+        private val DOCWIZZ_EXTENSIONS = setOf("rdy", "tkn", "wrk")
     }
 
     override fun init(context: ProcessorInitializationContext) {
@@ -265,6 +266,32 @@ class ReorderFiles(
             } else {
                 logger.debug("OCR directory does not exist or is not a directory: {}", ocrDirPath)
             }
+        }
+
+        deleteDocwizzFiles(itemId, baseDirPath)
+    }
+
+    private fun deleteDocwizzFiles(itemId: String, baseDirPath: Path) {
+        require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
+        val itemDir = baseDirPath.resolve("$TEKST_PREFIX$itemId").normalize()
+        requireWithinBaseDir(baseDirPath, itemDir)
+
+        if (!Files.exists(itemDir) || !Files.isDirectory(itemDir)) {
+            logger.debug("Item directory does not exist or is not a directory for DocWizz cleanup: {}", itemDir)
+            return
+        }
+
+        val docwizzFiles = Files.walk(itemDir).use { stream ->
+            stream.filter { path ->
+                Files.isRegularFile(path) && DOCWIZZ_EXTENSIONS.contains(path.fileName.toString().substringAfterLast('.', "").lowercase())
+            }.toList()
+        }
+
+        logger.info("Found {} DocWizz marker files to delete under {}", docwizzFiles.size, itemDir)
+        docwizzFiles.forEach { file ->
+            requireWithinBaseDir(baseDirPath, file)
+            Files.deleteIfExists(file)
+            logger.debug("Deleted DocWizz marker file '{}'", file)
         }
     }
 
