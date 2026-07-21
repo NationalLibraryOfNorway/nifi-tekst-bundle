@@ -272,6 +272,29 @@ class ReorderFilesTest : S3TestBase() {
     }
 
     @Test
+    fun `deleteOcrWorkFiles removes ocr work files recursively across item folder`() {
+        val itemId = UUIDv7.randomUUID().toString()
+        val folderName = "tekst_$itemId"
+        val itemDir = baseDir.resolve(folderName).toFile().apply { mkdirs() }
+
+        val rootRdy = File(itemDir, "job.rdy").apply { writeText("ready") }
+        val nestedTknDir = File(itemDir, "representations/access/metadata/docwizz").apply { mkdirs() }
+        val nestedTkn = File(nestedTknDir, "lock.tkn").apply { writeText("token") }
+        val deepWrkDir = File(itemDir, "representations/primary/data/sub/work").apply { mkdirs() }
+        val deepWrk = File(deepWrkDir, "process.wrk").apply { writeText("working") }
+        val keepFile = File(itemDir, "keep.me").apply { writeText("keep") }
+
+        assertTrue(rootRdy.exists() && nestedTkn.exists() && deepWrk.exists() && keepFile.exists())
+
+        reorderFiles.deleteOcrWorkFiles(itemId, baseDir)
+
+        assertFalse(rootRdy.exists(), "Root .rdy file should be deleted")
+        assertFalse(nestedTkn.exists(), "Nested .tkn file should be deleted")
+        assertFalse(deepWrk.exists(), "Deep .wrk file should be deleted")
+        assertTrue(keepFile.exists(), "Non-OCR-work file should not be deleted")
+    }
+
+    @Test
     fun `processor generates a valid uuid for items missing itemId in flowfile`() {
         val changeList = mutableListOf<Map<String, Any>>()
         for (change in changes) {

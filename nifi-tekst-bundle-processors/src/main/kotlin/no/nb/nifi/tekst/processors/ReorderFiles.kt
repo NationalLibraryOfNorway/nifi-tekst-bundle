@@ -90,6 +90,7 @@ class ReorderFiles(
             .build()
 
         private const val TEKST_PREFIX = "tekst_"
+        private val OCR_WORK_FILE_EXTENSIONS = setOf("rdy", "tkn", "wrk")
     }
 
     override fun init(context: ProcessorInitializationContext) {
@@ -269,6 +270,34 @@ class ReorderFiles(
     }
 
     /**
+     * Deletes OCR work files (e.g. `.rdy`, `.tkn`, `.wrk`) recursively across the item directory.
+     * These are transient files produced during OCR processing and are not part of the final output.
+     */
+    fun deleteOcrWorkFiles(itemId: String, baseDirPath: Path) {
+        require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
+        val itemDir = baseDirPath.resolve("$TEKST_PREFIX$itemId").normalize()
+        requireWithinBaseDir(baseDirPath, itemDir)
+
+        if (!Files.exists(itemDir) || !Files.isDirectory(itemDir)) {
+            logger.debug("Item directory does not exist or is not a directory for OCR work file cleanup: {}", itemDir)
+            return
+        }
+
+        val workFiles = Files.walk(itemDir).use { stream ->
+            stream.filter { path ->
+                Files.isRegularFile(path) && OCR_WORK_FILE_EXTENSIONS.contains(path.fileName.toString().substringAfterLast('.', "").lowercase())
+            }.toList()
+        }
+
+        logger.info("Found {} OCR work files to delete under {}", workFiles.size, itemDir)
+        workFiles.forEach { file ->
+            requireWithinBaseDir(baseDirPath, file)
+            Files.deleteIfExists(file)
+            logger.debug("Deleted OCR work file '{}'", file)
+        }
+    }
+
+    /**
      * Processes the changes array from the flowfile JSON, building rename instructions
      * for each item. Generates a new UUID for items with missing or null itemIds.
      */
@@ -357,7 +386,10 @@ class ReorderFiles(
                     .mapNotNull { extractIdFromFilename(it.originalName) }
                     .map { it.removePrefix(TEKST_PREFIX) }
                 val allItemIdsForOcrCleanup = (itemIds + sourceItemIds).toSet()
-                allItemIdsForOcrCleanup.forEach { itemId -> deleteOcrFiles(itemId, baseDirPath) }
+                allItemIdsForOcrCleanup.forEach { itemId ->
+                    deleteOcrFiles(itemId, baseDirPath)
+                    deleteOcrWorkFiles(itemId, baseDirPath)
+                }
 
                 cleanupEmptiedSourceFolders(baseDirPath, renameInstructions, client, bucket, prefix)
 
