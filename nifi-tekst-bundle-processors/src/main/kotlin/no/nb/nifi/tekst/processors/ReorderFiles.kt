@@ -90,7 +90,7 @@ class ReorderFiles(
             .build()
 
         private const val TEKST_PREFIX = "tekst_"
-        private val DOCWIZZ_EXTENSIONS = setOf("rdy", "tkn", "wrk")
+        private val OCR_WORK_FILE_EXTENSIONS = setOf("rdy", "tkn", "wrk")
     }
 
     override fun init(context: ProcessorInitializationContext) {
@@ -239,12 +239,7 @@ class ReorderFiles(
         }
     }
 
-    /**
-     * Deletes all DocWizz-produced artifacts for the given item:
-     * - OCR output files from both `access` and `primary` representation directories
-     * - DocWizz marker files (e.g. `.docwizz`) scattered anywhere under the item directory
-     */
-    fun deleteDocwizzArtifacts(itemId: String, baseDirPath: Path) {
+    fun deleteOcrFiles(itemId: String, baseDirPath: Path) {
         // itemId must be validated before calling this function
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
         val folderName = "$TEKST_PREFIX$itemId"
@@ -272,31 +267,33 @@ class ReorderFiles(
                 logger.debug("OCR directory does not exist or is not a directory: {}", ocrDirPath)
             }
         }
-
-        deleteDocwizzMarkerFiles(itemId, baseDirPath)
     }
 
-    private fun deleteDocwizzMarkerFiles(itemId: String, baseDirPath: Path) {
+    /**
+     * Deletes OCR work files (e.g. `.rdy`, `.tkn`, `.wrk`) recursively across the item directory.
+     * These are transient files produced during OCR processing and are not part of the final output.
+     */
+    fun deleteOcrWorkFiles(itemId: String, baseDirPath: Path) {
         require(isSafeName(itemId)) { "Invalid itemId: $itemId" }
         val itemDir = baseDirPath.resolve("$TEKST_PREFIX$itemId").normalize()
         requireWithinBaseDir(baseDirPath, itemDir)
 
         if (!Files.exists(itemDir) || !Files.isDirectory(itemDir)) {
-            logger.debug("Item directory does not exist or is not a directory for DocWizz cleanup: {}", itemDir)
+            logger.debug("Item directory does not exist or is not a directory for OCR work file cleanup: {}", itemDir)
             return
         }
 
-        val docwizzFiles = Files.walk(itemDir).use { stream ->
+        val workFiles = Files.walk(itemDir).use { stream ->
             stream.filter { path ->
-                Files.isRegularFile(path) && DOCWIZZ_EXTENSIONS.contains(path.fileName.toString().substringAfterLast('.', "").lowercase())
+                Files.isRegularFile(path) && OCR_WORK_FILE_EXTENSIONS.contains(path.fileName.toString().substringAfterLast('.', "").lowercase())
             }.toList()
         }
 
-        logger.info("Found {} DocWizz marker files to delete under {}", docwizzFiles.size, itemDir)
-        docwizzFiles.forEach { file ->
+        logger.info("Found {} OCR work files to delete under {}", workFiles.size, itemDir)
+        workFiles.forEach { file ->
             requireWithinBaseDir(baseDirPath, file)
             Files.deleteIfExists(file)
-            logger.debug("Deleted DocWizz marker file '{}'", file)
+            logger.debug("Deleted OCR work file '{}'", file)
         }
     }
 
@@ -389,7 +386,10 @@ class ReorderFiles(
                     .mapNotNull { extractIdFromFilename(it.originalName) }
                     .map { it.removePrefix(TEKST_PREFIX) }
                 val allItemIdsForOcrCleanup = (itemIds + sourceItemIds).toSet()
-                allItemIdsForOcrCleanup.forEach { itemId -> deleteDocwizzArtifacts(itemId, baseDirPath) }
+                allItemIdsForOcrCleanup.forEach { itemId ->
+                    deleteOcrFiles(itemId, baseDirPath)
+                    deleteOcrWorkFiles(itemId, baseDirPath)
+                }
 
                 cleanupEmptiedSourceFolders(baseDirPath, renameInstructions, client, bucket, prefix)
 
